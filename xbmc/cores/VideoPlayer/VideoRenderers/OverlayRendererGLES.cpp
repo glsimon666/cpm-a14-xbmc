@@ -166,6 +166,10 @@ COverlayTextureGLES::COverlayTextureGLES(const CDVDOverlayImage& o, CRect& rSour
     LoadTexture(GL_TEXTURE_2D, o.width, o.height, o.width * 4, &m_u, &m_v, false, rgba.data());
   }
 
+  // If the overlay is already authored as HDR PQ code values (e.g. UHD-BD PGS HDR subtitles),
+  // bypass the GUI shader's transferPQ stage to avoid a second SDR->PQ conversion.
+  m_bypassTransferPQ = o.m_isHdrPq;
+
   glBindTexture(GL_TEXTURE_2D, 0);
 
   if (o.source_width > 0 && o.source_height > 0)
@@ -438,7 +442,9 @@ void COverlayTextureGLES::Render(SRenderState& state)
 
   CRenderSystemGLES* renderSystem =
       dynamic_cast<CRenderSystemGLES*>(CServiceBroker::GetRenderSystem());
-  renderSystem->EnableGUIShader(ShaderMethodGLES::SM_TEXTURE);
+
+  renderSystem->EnableGUIShader(m_bypassTransferPQ ? ShaderMethodGLES::SM_TEXTURE_NOBLEND_NO_PQ
+                                                   : ShaderMethodGLES::SM_TEXTURE_NOBLEND);
   GLint posLoc = renderSystem->GUIShaderGetPos();
   GLint colLoc = renderSystem->GUIShaderGetCol();
   GLint tex0Loc = renderSystem->GUIShaderGetCoord0();

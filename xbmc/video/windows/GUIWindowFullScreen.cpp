@@ -85,45 +85,30 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
   {
   case ACTION_NAV_BACK:
   {
-    // 核心判断条件：全屏 + Player.HasMenu + 正在播放视频
+    // 核心判断：全屏+有菜单+播放中 + 非蓝光菜单
     bool isFullscreen = CServiceBroker::GetWinSystem()->GetGfxContext().IsFullScreenVideo();
-    bool hasMenu = appPlayer->IsInMenu(); // 对应player.hasmenu
+    bool hasMenu = appPlayer->IsInMenu();
     bool isPlayingVideo = appPlayer->IsPlayingVideo();
+    // 简洁判断蓝光菜单：有底层播放器且处于蓝光菜单则跳过
+    bool isBDMenu = appPlayer->GetInternal() && appPlayer->GetInternal()->IsInBDMenu();
 
-    if (isFullscreen && hasMenu && isPlayingVideo)
+    if (!isBDMenu && isFullscreen && hasMenu && isPlayingVideo)
     {
-      // 弹出YesNo对话框：标题+内容使用Kodi内置本地化字符串（也可自定义）
-      CGUIDialogYesNo* pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
+      auto pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
       if (pDialog)
       {
-        // 1. 尝试获取本地化字符串（ID=30000）
-        std::string exitText = g_localizeStrings.Get(30000);
-        
-        // 2. Fallback逻辑：若获取失败（空字符串），使用中文默认文本
-        if (exitText.empty())
-        {
-          CLog::Log(LOGWARNING, "Localized string 30000 not found, use fallback Chinese text");
-          exitText = "是否退出当前视频？"; // 中文兜底文本
-        }
-
-        // 3. 设置对话框文本（使用处理后的字符串）
-        pDialog->SetHeading(CVariant{"EXIT"});
-        pDialog->SetLine(0, CVariant{exitText}); // 替换为处理后的变量
+        pDialog->SetHeading(CVariant{"EXIT"});       // 直接写死标题
+        pDialog->SetLine(0, CVariant{"Do you want to exit the current video?"}); // 直接写死内容
         pDialog->SetLine(1, CVariant{""});
         pDialog->SetLine(2, CVariant{""});
         pDialog->Open();
 
-        // 处理对话框结果
-        if (pDialog->IsConfirmed()) // 用户选择YES
-        {
-          // 退出播放
-          appPlayer->Stop(); // 停止播放
-        }
-        // 用户选择NO：不做任何操作
+        if (pDialog->IsConfirmed())
+          g_application.StopPlaying(); // 全局停止播放（修复编译错误）
+
         return true; // 拦截默认BACK行为
       }
     }
-    // 不满足条件：执行默认BACK逻辑
     break;
   }
   case ACTION_SHOW_OSD:

@@ -25099,6 +25099,3 @@ msgstr ""
 msgctxt "#50204"
 msgid "Limit max only"
 msgstr ""
-
-msgid "30000"
-msgstr "Do you want to exit the current video?"

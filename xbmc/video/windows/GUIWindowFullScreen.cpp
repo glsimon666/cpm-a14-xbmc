@@ -87,25 +87,17 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
   case ACTION_MOVE_LEFT:
   case ACTION_MOVE_RIGHT:
     {
-      // 逻辑：如果当前存在蓝光/DVD菜单
       if (hasMenu)
       {
-        // 获取扩展进度条对话框实例
-        CGUIDialog* pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetDialog(WINDOW_DIALOG_EXT_PROGRESS);
-        if (pDialog)
-        {
-          // 如果对话框没在运行，则打开它
-          if (!pDialog->IsDialogRunning())
-          {
-            pDialog->Open();
-          }
-          return true; // 拦截动作，不执行 Seek
-        }
+        // 使用 ActivateWindow (10151) 激活扩展进度条
+        // 这会确保窗口被推入堆栈并正确处理显示逻辑
+        CServiceBroker::GetGUI()->GetWindowManager().ActivateWindow(WINDOW_DIALOG_EXT_PROGRESS);
+        
+        return true; // 拦截动作，不执行 Seek
       }
-      // 如果不处于菜单模式，不处理，走默认的跳转逻辑
+      // 不处于 HasMenu 状态时，走 break 交给默认 Seek 逻辑
       break; 
     }
-
   case ACTION_NAV_BACK:
   {
     
@@ -187,30 +179,13 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
 
   case ACTION_SHOW_INFO:
     {
-      if (hasMenu)
-      {
-        // 逻辑：如果是在蓝光/DVD菜单模式下，显示解码/处理信息 (PlayerProcessInfo)
-        CGUIDialog* pProcessInfo = CServiceBroker::GetGUI()->GetWindowManager().GetDialog(WINDOW_DIALOG_PLAYER_PROCESS_INFO);
-        if (pProcessInfo)
-        {
-          if (pProcessInfo->IsDialogRunning())
-            pProcessInfo->Close();
-          else
-            pProcessInfo->Open();
-          
-          return true;
-        }
-      }
-      else
-      {
-        // 逻辑：普通模式，显示原有视频简介信息 (FullScreenInfo)
-        CGUIDialogFullScreenInfo* pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogFullScreenInfo>(WINDOW_DIALOG_FULLSCREEN_INFO);
-        if (pDialog)
-        {
-          pDialog->Open();
-          return true;
-        }
-      }
+      
+      CGUIDialog* pProcessInfo = CServiceBroker::GetGUI()->GetWindowManager().GetDialog(WINDOW_DIALOG_PLAYER_PROCESS_INFO);
+      
+      pProcessInfo->Open();
+      
+      return true;
+   
       break;
     }
 

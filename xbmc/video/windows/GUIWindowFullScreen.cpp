@@ -30,6 +30,7 @@
 #include "video/dialogs/GUIDialogFullScreenInfo.h"
 #include "video/dialogs/GUIDialogSubtitleSettings.h"
 #include "windowing/WinSystem.h"
+#include "dialogs/GUIDialogYesNo.h"
 
 #include <algorithm>
 #include <stdio.h>
@@ -82,9 +83,57 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
   const auto appPlayer = components.GetComponent<CApplicationPlayer>();
   switch (action.GetID())
   {
+  case ACTION_NAV_BACK:
+  {
+    // 核心判断条件：全屏 + Player.HasMenu + 正在播放视频
+    bool isFullscreen = CServiceBroker::GetWinSystem()->GetGfxContext().IsFullScreenVideo();
+    bool hasMenu = appPlayer->IsInMenu(); // 对应player.hasmenu
+    bool isPlayingVideo = appPlayer->IsPlayingVideo();
+
+    if (isFullscreen && hasMenu && isPlayingVideo)
+    {
+      // 弹出YesNo对话框：标题+内容使用Kodi内置本地化字符串（也可自定义）
+      CGUIDialogYesNo* pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
+      if (pDialog)
+      {
+        // 设置对话框内容：标题（1229=退出）、内容（自定义提示语，也可用本地化字符串）
+        pDialog->SetHeading(CVariant{g_localizeStrings.Get(1229)});
+        pDialog->SetLine(0, CVariant{g_localizeStrings.Get(30000)}); 
+        pDialog->SetLine(1, CVariant{""});
+        pDialog->SetLine(2, CVariant{""});
+        pDialog->Open(); // 显示对话框并等待用户操作
+
+        // 处理对话框结果
+        if (pDialog->IsConfirmed()) // 用户选择YES
+        {
+          // 退出播放
+          appPlayer->Stop(); // 停止播放
+        }
+        // 用户选择NO：不做任何操作
+        return true; // 拦截默认BACK行为
+      }
+    }
+    // 不满足条件：执行默认BACK逻辑
+    break;
+  }
   case ACTION_SHOW_OSD:
-    ToggleOSD();
-    return true;
+    {
+      // 1. 判断核心条件：全屏视频 + Player.HasMenu
+      bool isFullscreenVideo = CServiceBroker::GetWinSystem()->GetGfxContext().IsFullScreenVideo();
+      bool playerHasMenu = appPlayer->IsInMenu(); // 对应Player.HasMenu
+      
+      if (isFullscreenVideo && playerHasMenu)
+      {
+        // 满足条件：执行ShowVideoMenu（触发视频菜单）
+        appPlayer->OnAction(CAction(ACTION_SHOW_VIDEOMENU));
+      }
+      else
+      {
+        // 不满足条件：执行原有ToggleOSD逻辑
+        ToggleOSD();
+      }
+      return true;
+    }
 
   case ACTION_TRIGGER_OSD:
     TriggerOSD();

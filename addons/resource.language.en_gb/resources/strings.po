@@ -25100,6 +25100,5 @@ msgctxt "#50204"
 msgid "Limit max only"
 msgstr ""
 
-#. "Ddd Exit Dialog for BD-J"
 msgid "30000"
 msgstr "Do you want to exit the current video?"

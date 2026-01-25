@@ -96,12 +96,22 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
       CGUIDialogYesNo* pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
       if (pDialog)
       {
-        // 设置对话框内容：标题（1229=退出）、内容（自定义提示语，也可用本地化字符串）
-        pDialog->SetHeading(CVariant{g_localizeStrings.Get(1229)});
-        pDialog->SetLine(0, CVariant{g_localizeStrings.Get(30000)}); 
+        // 1. 尝试获取本地化字符串（ID=30000）
+        std::string exitText = g_localizeStrings.Get(30000);
+        
+        // 2. Fallback逻辑：若获取失败（空字符串），使用中文默认文本
+        if (exitText.empty())
+        {
+          CLog::Log(LOGWARNING, "Localized string 30000 not found, use fallback Chinese text");
+          exitText = "是否退出当前视频？"; // 中文兜底文本
+        }
+
+        // 3. 设置对话框文本（使用处理后的字符串）
+        pDialog->SetHeading(CVariant{"EXIT"});
+        pDialog->SetLine(0, CVariant{exitText}); // 替换为处理后的变量
         pDialog->SetLine(1, CVariant{""});
         pDialog->SetLine(2, CVariant{""});
-        pDialog->Open(); // 显示对话框并等待用户操作
+        pDialog->Open();
 
         // 处理对话框结果
         if (pDialog->IsConfirmed()) // 用户选择YES

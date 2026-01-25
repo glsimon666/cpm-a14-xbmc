@@ -81,23 +81,41 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
 {
   auto& components = CServiceBroker::GetAppComponents();
   const auto appPlayer = components.GetComponent<CApplicationPlayer>();
+  bool hasMenu = appPlayer->IsInMenu();
   switch (action.GetID())
   {
+  case ACTION_MOVE_LEFT:
+  case ACTION_MOVE_RIGHT:
+    {
+      // 逻辑：如果当前存在蓝光/DVD菜单
+      if (hasMenu)
+      {
+        // 获取扩展进度条对话框实例
+        CGUIDialog* pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetDialog(WINDOW_DIALOG_EXT_PROGRESS);
+        if (pDialog)
+        {
+          // 如果对话框没在运行，则打开它
+          if (!pDialog->IsDialogRunning())
+          {
+            pDialog->Open();
+          }
+          return true; // 拦截动作，不执行 Seek
+        }
+      }
+      // 如果不处于菜单模式，不处理，走默认的跳转逻辑
+      break; 
+    }
+
   case ACTION_NAV_BACK:
   {
-    // 核心判断：全屏+有菜单+播放中 + 非蓝光菜单
-    bool isFullscreen = CServiceBroker::GetWinSystem()->GetGfxContext().IsFullScreenVideo();
-    bool hasMenu = appPlayer->IsInMenu();
-    bool isPlayingVideo = appPlayer->IsPlayingVideo();
-    // 简洁判断蓝光菜单：有底层播放器且处于蓝光菜单则跳过
-    bool isBDMenu = appPlayer->GetInternal() && appPlayer->GetInternal()->IsInBDMenu();
+    
 
-    if (!isBDMenu && isFullscreen && hasMenu && isPlayingVideo)
+    if (hasMenu)
     {
       auto pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
       if (pDialog)
       {
-        pDialog->SetHeading(CVariant{"EXIT"});       // 直接写死标题
+        pDialog->SetHeading(CVariant{"CoreELEC"});       // 直接写死标题
         pDialog->SetLine(0, CVariant{"Do you want to exit the current video?"}); // 直接写死内容
         pDialog->SetLine(1, CVariant{""});
         pDialog->SetLine(2, CVariant{""});
@@ -169,12 +187,29 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
 
   case ACTION_SHOW_INFO:
     {
-      CGUIDialogFullScreenInfo* pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogFullScreenInfo>(WINDOW_DIALOG_FULLSCREEN_INFO);
-      if (pDialog)
+      if (hasMenu)
       {
-        CFileItem item(g_application.CurrentFileItem());
-        pDialog->Open();
-        return true;
+        // 逻辑：如果是在蓝光/DVD菜单模式下，显示解码/处理信息 (PlayerProcessInfo)
+        CGUIDialog* pProcessInfo = CServiceBroker::GetGUI()->GetWindowManager().GetDialog(WINDOW_DIALOG_PLAYER_PROCESS_INFO);
+        if (pProcessInfo)
+        {
+          if (pProcessInfo->IsDialogRunning())
+            pProcessInfo->Close();
+          else
+            pProcessInfo->Open();
+          
+          return true;
+        }
+      }
+      else
+      {
+        // 逻辑：普通模式，显示原有视频简介信息 (FullScreenInfo)
+        CGUIDialogFullScreenInfo* pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogFullScreenInfo>(WINDOW_DIALOG_FULLSCREEN_INFO);
+        if (pDialog)
+        {
+          pDialog->Open();
+          return true;
+        }
       }
       break;
     }

@@ -31,6 +31,8 @@
 #include "video/dialogs/GUIDialogSubtitleSettings.h"
 #include "windowing/WinSystem.h"
 #include "dialogs/GUIDialogYesNo.h"
+#include "dialogs/GUIDialogExtendedProgressBar.h"
+#include "utils/log.h"
 
 #include <algorithm>
 #include <stdio.h>
@@ -89,38 +91,61 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
     {
       if (hasMenu)
       {
-        // 使用 ActivateWindow (10151) 激活扩展进度条
-        // 这会确保窗口被推入堆栈并正确处理显示逻辑
-        CServiceBroker::GetGUI()->GetWindowManager().ActivateWindow(WINDOW_DIALOG_EXT_PROGRESS);
-        
+        // 封装扩展进度条激活逻辑（确保在 GUI 主线程执行）
+        auto showExtProgressBar = []() {
+          // 1. 获取扩展进度条对话框实例
+          CGUIDialogExtendedProgressBar* progressDialog = 
+              CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogExtendedProgressBar>(WINDOW_DIALOG_EXT_PROGRESS);
+          if (!progressDialog)
+          {
+            CLog::LogF(LOGERROR, "扩展进度条对话框实例获取失败！");
+            return;
+          }
+
+          // 2. 创建进度条句柄（自动触发 Open()，替代 ActivateWindow）
+          // 可自定义进度条标题（根据业务需求调整）
+          std::string progressTitle = "视频进度"; 
+          CGUIDialogProgressBarHandle* progressHandle = progressDialog->GetHandle(progressTitle);
+          if (!progressHandle)
+          {
+            CLog::LogF(LOGERROR, "扩展进度条句柄创建失败！");
+            return;
+          }
+
+        };
+
+        // 3. 发送到 GUI 主线程执行（全屏场景必须，避免线程冲突）
+        CServiceBroker::GetAppMessenger()->PostMsg(TMSG_GUI_EXECUTE, 0, 0, 
+            static_cast<void*>(new std::function<void()>(showExtProgressBar)));
+
         return true; // 拦截动作，不执行 Seek
       }
-      // 不处于 HasMenu 状态时，走 break 交给默认 Seek 逻辑
+      // 不处于 HasMenu 状态时，走默认 Seek 逻辑
       break; 
     }
   case ACTION_NAV_BACK:
-  {
-    
-
-    if (hasMenu)
     {
-      auto pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
-      if (pDialog)
+      
+
+      if (hasMenu)
       {
-        pDialog->SetHeading(CVariant{"CoreELEC"});       // 直接写死标题
-        pDialog->SetLine(0, CVariant{"Do you want to exit the current video?"}); // 直接写死内容
-        pDialog->SetLine(1, CVariant{""});
-        pDialog->SetLine(2, CVariant{""});
-        pDialog->Open();
+        auto pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
+        if (pDialog)
+        {
+          pDialog->SetHeading(CVariant{"CoreELEC"});       // 直接写死标题
+          pDialog->SetLine(0, CVariant{"Do you want to exit the current video?"}); // 直接写死内容
+          pDialog->SetLine(1, CVariant{""});
+          pDialog->SetLine(2, CVariant{""});
+          pDialog->Open();
 
-        if (pDialog->IsConfirmed())
-          g_application.StopPlaying(); // 全局停止播放（修复编译错误）
+          if (pDialog->IsConfirmed())
+            g_application.StopPlaying(); // 全局停止播放（修复编译错误）
 
-        return true; // 拦截默认BACK行为
+          return true; // 拦截默认BACK行为
+        }
       }
+      break;
     }
-    break;
-  }
   case ACTION_SHOW_OSD:
     {
       // 1. 判断核心条件：全屏视频 + Player.HasMenu

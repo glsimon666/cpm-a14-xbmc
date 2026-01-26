@@ -21,7 +21,7 @@ CGUIDialogPlayerProcessInfo::~CGUIDialogPlayerProcessInfo(void) = default;
 
 bool CGUIDialogPlayerProcessInfo::OnAction(const CAction &action)
 {
-  if (action.GetID() == ACTION_PLAYER_PROCESS_INFO)
+  if (action.GetID() == ACTION_PLAYER_PROCESS_INFO || action.GetID() == ACTION_INFO)
   {
     Close();
     return true;

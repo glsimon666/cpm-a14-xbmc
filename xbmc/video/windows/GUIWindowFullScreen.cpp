@@ -1,9 +1,9 @@
 /*
- *  Copyright (C) 2005-2018 Team Kodi
- *  This file is part of Kodi - https://kodi.tv
+ * Copyright (C) 2005-2018 Team Kodi
+ * This file is part of Kodi - https://kodi.tv
  *
- *  SPDX-License-Identifier: GPL-2.0-or-later
- *  See LICENSES/README.md for more information.
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ * See LICENSES/README.md for more information.
  */
 
 #include "GUIWindowFullScreen.h"
@@ -32,6 +32,7 @@
 #include "windowing/WinSystem.h"
 #include "dialogs/GUIDialogYesNo.h"
 #include "dialogs/GUIDialogExtendedProgressBar.h"
+#include "dialogs/GUIDialogNotification.h"
 #include "utils/log.h"
 
 #include <algorithm>
@@ -54,24 +55,13 @@ CGUIWindowFullScreen::CGUIWindowFullScreen()
   m_viewModeChanged = true;
   m_bShowCurrentTime = false;
   m_loadType = KEEP_IN_MEMORY;
-  // audio
-  //  - language
-  //  - volume
-  //  - stream
-
-  // video
-  //  - Create Bookmark (294)
-  //  - Cycle bookmarks (295)
-  //  - Clear bookmarks (296)
-  //  - jump to specific time
-  //  - slider
-  //  - av delay
-
-  // subtitles
-  //  - delay
-  //  - language
 
   m_controlStats = new GUICONTROLSTATS;
+  
+  // 初始化新增变量
+  m_fDelayedSeekTime = -1.0;
+  m_lastActionTicks = 0;
+  m_bIsDelaySeeking = false;
 }
 
 CGUIWindowFullScreen::~CGUIWindowFullScreen(void)
@@ -84,82 +74,85 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
   auto& components = CServiceBroker::GetAppComponents();
   const auto appPlayer = components.GetComponent<CApplicationPlayer>();
   bool hasMenu = appPlayer->IsInMenu();
+
   switch (action.GetID())
   {
   case ACTION_MOVE_LEFT:
   case ACTION_MOVE_RIGHT:
     {
-      auto& components = CServiceBroker::GetAppComponents();
-      const auto appPlayer = components.GetComponent<CApplicationPlayer>();
-      
-      // 替换原 hasMenu：判断播放器是否处于菜单状态
-      if (appPlayer->IsInMenu())
+      if (hasMenu)
       {
-        // 1. 获取扩展进度条对话框实例
-        CGUIDialogExtendedProgressBar* progressDialog = 
-            CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogExtendedProgressBar>(WINDOW_DIALOG_EXT_PROGRESS);
-        if (!progressDialog)
+        unsigned int now = CServiceBroker::GetWinSystem()->GetGfxContext().GetTickTick();
+
+        // 1. 初始化模拟跳转时间
+        if (!m_bIsDelaySeeking)
         {
-          CLog::LogF(LOGERROR, "CGUIWindowFullScreen: 获取扩展进度条对话框实例失败！");
-          return true; // 拦截动作，不执行Seek
+          m_fDelayedSeekTime = appPlayer->GetTime();
+          m_bIsDelaySeeking = true;
         }
 
-        // 2. 创建进度条句柄（自动触发Open()，激活对话框）
-        std::string progressTitle = "视频进度调整"; // 自定义进度条标题
-        CGUIDialogProgressBarHandle* progressHandle = progressDialog->GetHandle(progressTitle);
-        if (!progressHandle)
+        // 2. 线性步进：固定 30 秒
+        if (action.GetID() == ACTION_MOVE_RIGHT)
+          m_fDelayedSeekTime += 30.0;
+        else
+          m_fDelayedSeekTime -= 30.0;
+
+        // 边界检查
+        double totalTime = appPlayer->GetTotalTime();
+        if (m_fDelayedSeekTime > totalTime) m_fDelayedSeekTime = totalTime;
+        if (m_fDelayedSeekTime < 0) m_fDelayedSeekTime = 0;
+
+        // 3. 弹出 Notification 反馈
+        std::string seekStr = StringUtils::SecondsToTimeString((long)m_fDelayedSeekTime);
+        std::string totalStr = StringUtils::SecondsToTimeString((long)totalTime);
+        std::string msg = seekStr + " / " + totalStr;
+
+        CGUIDialogNotification* pNotif = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogNotification>(WINDOW_DIALOG_NOTIFICATION);
+        if (pNotif)
         {
-          CLog::LogF(LOGERROR, "CGUIWindowFullScreen: 创建进度条句柄失败！");
-          return true; // 拦截动作，不执行Seek
+          pNotif->ShowNotification("调整播放进度", msg, "info", 2000);
         }
 
-        return true; // 拦截左右键动作，不执行默认Seek逻辑
+        // 4. 更新时间戳，重置 1s 倒计时
+        m_lastActionTicks = now;
+
+        return true; // 拦截动作，不执行默认逻辑
       }
-      
-      // 非菜单状态时，交给默认Seek逻辑处理
       break;
     }
-  
-  // 非菜单状态时，交给默认Seek逻辑处理
-  break; 
-    }
+
   case ACTION_NAV_BACK:
     {
-      
-
       if (hasMenu)
       {
         auto pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
         if (pDialog)
         {
-          pDialog->SetHeading(CVariant{"CoreELEC"});       // 直接写死标题
-          pDialog->SetLine(0, CVariant{"Do you want to exit the current video?"}); // 直接写死内容
+          pDialog->SetHeading(CVariant{"CoreELEC"});
+          pDialog->SetLine(0, CVariant{"Do you want to exit the current video?"});
           pDialog->SetLine(1, CVariant{""});
           pDialog->SetLine(2, CVariant{""});
           pDialog->Open();
 
           if (pDialog->IsConfirmed())
-            g_application.StopPlaying(); // 全局停止播放（修复编译错误）
+            g_application.StopPlaying();
 
-          return true; // 拦截默认BACK行为
+          return true;
         }
       }
       break;
     }
   case ACTION_SHOW_OSD:
     {
-      // 1. 判断核心条件：全屏视频 + Player.HasMenu
       bool isFullscreenVideo = CServiceBroker::GetWinSystem()->GetGfxContext().IsFullScreenVideo();
-      bool playerHasMenu = appPlayer->IsInMenu(); // 对应Player.HasMenu
+      bool playerHasMenu = appPlayer->IsInMenu();
       
       if (isFullscreenVideo && playerHasMenu)
       {
-        // 满足条件：执行ShowVideoMenu（触发视频菜单）
         appPlayer->OnAction(CAction(ACTION_SHOW_VIDEOMENU));
       }
       else
       {
-        // 不满足条件：执行原有ToggleOSD逻辑
         ToggleOSD();
       }
       return true;
@@ -190,7 +183,6 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
 
   case ACTION_SHOW_GUI:
     {
-      // switch back to the menu
       CServiceBroker::GetGUI()->GetWindowManager().PreviousWindow();
       return true;
     }
@@ -204,18 +196,13 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
 
   case ACTION_SHOW_INFO:
     {
-      
       CGUIDialog* pProcessInfo = CServiceBroker::GetGUI()->GetWindowManager().GetDialog(WINDOW_DIALOG_PLAYER_PROCESS_INFO);
-      
       pProcessInfo->Open();
-      
       return true;
-   
-      break;
     }
 
   case ACTION_ASPECT_RATIO:
-    { // toggle the aspect ratio mode (only if the info is onscreen)
+    {
       if (m_dwShowViewModeTimeout.time_since_epoch().count() != 0)
       {
         CVideoSettings vs = appPlayer->GetVideoSettings();
@@ -266,7 +253,6 @@ void CGUIWindowFullScreen::ClearBackground()
 void CGUIWindowFullScreen::OnWindowLoaded()
 {
   CGUIWindow::OnWindowLoaded();
-  // override the clear colour - we must never clear fullscreen
   m_clearBackground = 0;
 }
 
@@ -276,12 +262,10 @@ bool CGUIWindowFullScreen::OnMessage(CGUIMessage& message)
   {
   case GUI_MSG_WINDOW_INIT:
     {
-      // check whether we've come back here from a window during which time we've actually
-      // stopped playing videos
       const auto& components = CServiceBroker::GetAppComponents();
       const auto appPlayer = components.GetComponent<CApplicationPlayer>();
       if (message.GetParam1() == WINDOW_INVALID && !appPlayer->IsPlayingVideo())
-      { // why are we here if nothing is playing???
+      {
         CServiceBroker::GetGUI()->GetWindowManager().PreviousWindow();
         return true;
       }
@@ -290,29 +274,19 @@ bool CGUIWindowFullScreen::OnMessage(CGUIMessage& message)
       guiInfo.SetShowInfo(false);
       m_bShowCurrentTime = false;
 
-      // switch resolution
       CServiceBroker::GetWinSystem()->GetGfxContext().SetFullScreenVideo(true);
-
-      // now call the base class to load our windows
       CGUIWindow::OnMessage(message);
 
       m_dwShowViewModeTimeout = {};
       m_viewModeChanged = true;
-
-
       return true;
     }
   case GUI_MSG_WINDOW_DEINIT:
     {
-      // close all active modal dialogs
       CServiceBroker::GetGUI()->GetWindowManager().CloseInternalModalDialogs(true);
-
       CGUIWindow::OnMessage(message);
-
       CServiceBroker::GetSettingsComponent()->GetSettings()->Save();
-
       CServiceBroker::GetWinSystem()->GetGfxContext().SetFullScreenVideo(false);
-
       return true;
     }
   case GUI_MSG_SETFOCUS:
@@ -328,7 +302,7 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
                                                 const MOUSE::CMouseEvent& event)
 {
   if (event.m_id == ACTION_MOUSE_RIGHT_CLICK)
-  { // no control found to absorb this click - go back to GUI
+  {
     OnAction(CAction(ACTION_SHOW_GUI));
     return EVENT_RESULT_HANDLED;
   }
@@ -340,7 +314,7 @@ EVENT_RESULT CGUIWindowFullScreen::OnMouseEvent(const CPoint& point,
   {
     return g_application.OnAction(CAction(ACTION_ANALOG_SEEK_BACK, 0.5f)) ? EVENT_RESULT_HANDLED : EVENT_RESULT_UNHANDLED;
   }
-  if (event.m_id >= ACTION_GESTURE_NOTIFY && event.m_id <= ACTION_GESTURE_END) // gestures
+  if (event.m_id >= ACTION_GESTURE_NOTIFY && event.m_id <= ACTION_GESTURE_END)
     return EVENT_RESULT_UNHANDLED;
   return EVENT_RESULT_UNHANDLED;
 }
@@ -351,10 +325,6 @@ void CGUIWindowFullScreen::FrameMove()
   const auto appPlayer = components.GetComponent<CApplicationPlayer>();
   if (!appPlayer->HasPlayer())
     return;
-
-  //----------------------
-  // ViewMode Information
-  //----------------------
 
   auto now = std::chrono::steady_clock::now();
   auto duration =
@@ -369,9 +339,7 @@ void CGUIWindowFullScreen::FrameMove()
   if (m_dwShowViewModeTimeout.time_since_epoch().count() != 0)
   {
     RESOLUTION_INFO res = CServiceBroker::GetWinSystem()->GetGfxContext().GetResInfo();
-
     {
-      // get the "View Mode" string
       const std::string& strTitle = g_localizeStrings.Get(629);
       const auto& vs = appPlayer->GetVideoSettings();
       int sId = CViewModeSettings::GetViewModeStringIndex(vs.m_ViewMode);
@@ -381,11 +349,9 @@ void CGUIWindowFullScreen::FrameMove()
       msg.SetLabel(strInfo);
       OnMessage(msg);
     }
-    // show sizing information
     VideoStreamInfo info;
     appPlayer->GetVideoStreamInfo(CURRENT_STREAM, info);
     {
-      // Splitres scaling factor
       float xscale = (float)res.iScreenWidth  / (float)res.iWidth;
       float yscale = (float)res.iScreenHeight / (float)res.iHeight;
 
@@ -400,7 +366,6 @@ void CGUIWindowFullScreen::FrameMove()
       msg.SetLabel(strSizing);
       OnMessage(msg);
     }
-    // show resolution information
     {
       std::string strStatus;
       if (CServiceBroker::GetWinSystem()->IsFullScreen())
@@ -442,15 +407,29 @@ void CGUIWindowFullScreen::Process(unsigned int currentTime, CDirtyRegionList &d
 {
   const auto& components = CServiceBroker::GetAppComponents();
   const auto appPlayer = components.GetComponent<CApplicationPlayer>();
+
+  // --- 核心：处理延迟跳转确认逻辑 ---
+  if (m_bIsDelaySeeking)
+  {
+    unsigned int now = CServiceBroker::GetWinSystem()->GetGfxContext().GetTickTick();
+    if (now - m_lastActionTicks > 1000) // 1秒无操作则执行
+    {
+      appPlayer->SeekTime(m_fDelayedSeekTime);
+      m_bIsDelaySeeking = false;
+      m_fDelayedSeekTime = -1.0;
+
+      CGUIDialogNotification* pNotif = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogNotification>(WINDOW_DIALOG_NOTIFICATION);
+      if (pNotif)
+        pNotif->Close(true);
+    }
+  }
+
   if (appPlayer->IsRenderingGuiLayer())
     MarkDirtyRegion();
 
   m_controlStats->Reset();
-
   CGUIWindow::Process(currentTime, dirtyregion);
 
-  //! @todo This isn't quite optimal - ideally we'd only be dirtying up the actual video render rect
-  //!       which is probably the job of the renderer as it can more easily track resizing etc.
   m_renderRegion.SetRect(0, 0, (float)CServiceBroker::GetWinSystem()->GetGfxContext().GetWidth(), (float)CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight());
 }
 
@@ -491,7 +470,6 @@ void CGUIWindowFullScreen::ToggleOSD()
     else
       pOSD->Open();
   }
-
   MarkDirtyRegion();
 }
 

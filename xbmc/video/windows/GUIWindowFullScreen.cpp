@@ -89,39 +89,39 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
   case ACTION_MOVE_LEFT:
   case ACTION_MOVE_RIGHT:
     {
-      if (hasMenu)
+      auto& components = CServiceBroker::GetAppComponents();
+      const auto appPlayer = components.GetComponent<CApplicationPlayer>();
+      
+      // 替换原 hasMenu：判断播放器是否处于菜单状态
+      if (appPlayer->IsInMenu())
       {
-        // 封装扩展进度条激活逻辑（确保在 GUI 主线程执行）
-        auto showExtProgressBar = []() {
-          // 1. 获取扩展进度条对话框实例
-          CGUIDialogExtendedProgressBar* progressDialog = 
-              CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogExtendedProgressBar>(WINDOW_DIALOG_EXT_PROGRESS);
-          if (!progressDialog)
-          {
-            CLog::LogF(LOGERROR, "扩展进度条对话框实例获取失败！");
-            return;
-          }
+        // 1. 获取扩展进度条对话框实例
+        CGUIDialogExtendedProgressBar* progressDialog = 
+            CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogExtendedProgressBar>(WINDOW_DIALOG_EXT_PROGRESS);
+        if (!progressDialog)
+        {
+          CLog::LogF(LOGERROR, "CGUIWindowFullScreen: 获取扩展进度条对话框实例失败！");
+          return true; // 拦截动作，不执行Seek
+        }
 
-          // 2. 创建进度条句柄（自动触发 Open()，替代 ActivateWindow）
-          // 可自定义进度条标题（根据业务需求调整）
-          std::string progressTitle = "视频进度"; 
-          CGUIDialogProgressBarHandle* progressHandle = progressDialog->GetHandle(progressTitle);
-          if (!progressHandle)
-          {
-            CLog::LogF(LOGERROR, "扩展进度条句柄创建失败！");
-            return;
-          }
+        // 2. 创建进度条句柄（自动触发Open()，激活对话框）
+        std::string progressTitle = "视频进度调整"; // 自定义进度条标题
+        CGUIDialogProgressBarHandle* progressHandle = progressDialog->GetHandle(progressTitle);
+        if (!progressHandle)
+        {
+          CLog::LogF(LOGERROR, "CGUIWindowFullScreen: 创建进度条句柄失败！");
+          return true; // 拦截动作，不执行Seek
+        }
 
-        };
-
-        // 3. 发送到 GUI 主线程执行（全屏场景必须，避免线程冲突）
-        CServiceBroker::GetAppMessenger()->PostMsg(TMSG_GUI_EXECUTE, 0, 0, 
-            static_cast<void*>(new std::function<void()>(showExtProgressBar)));
-
-        return true; // 拦截动作，不执行 Seek
+        return true; // 拦截左右键动作，不执行默认Seek逻辑
       }
-      // 不处于 HasMenu 状态时，走默认 Seek 逻辑
-      break; 
+      
+      // 非菜单状态时，交给默认Seek逻辑处理
+      break;
+    }
+  
+  // 非菜单状态时，交给默认Seek逻辑处理
+  break; 
     }
   case ACTION_NAV_BACK:
     {

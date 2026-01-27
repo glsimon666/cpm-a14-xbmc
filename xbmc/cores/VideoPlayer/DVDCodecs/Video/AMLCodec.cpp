@@ -2079,7 +2079,9 @@ bool CAMLCodec::OpenDecoder()
   aml_dv_open(hints.hdrType, hints.bitdepth);
 
   // Now have the HDRType resolved, ok to set the transfer pq - so renderer can set the shaders as needed.
-  aml_set_transfer_pq(hints.hdrType, hints.bitdepth);
+
+  aml_set_transfer_pq(m_hints.hdrType, m_hints.bitdepth);
+  aml_set_osd_pq_bypass(m_hints.hdrType);
 
   SetProcessInfoVideoDetails();
 
@@ -2319,7 +2321,11 @@ void CAMLCodec::CloseDecoder()
 
   CloseAmlVideo();
 
+
   aml_dv_close();
+
+  // Ensure kernel OSD PQ bypass doesn't remain enabled after playback ends.
+  aml_set_osd_pq_bypass(StreamHdrType::HDR_TYPE_NONE);
 }
 
 void CAMLCodec::CloseAmlVideo()

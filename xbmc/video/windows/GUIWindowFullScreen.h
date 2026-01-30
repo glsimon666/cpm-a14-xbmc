@@ -37,9 +37,17 @@ private:
   void ToggleOSD();
   void TriggerOSD();
   CGUIDialog *GetOSD();
+  
+  // 新增 Seek 处理逻辑
+  void InitiateSeek(bool forward);
+  void ExecuteSeek();
 
   bool m_viewModeChanged;
   std::chrono::time_point<std::chrono::steady_clock> m_dwShowViewModeTimeout;
 
   bool m_bShowCurrentTime;
+
+  // 新增 Seek 控制变量
+  bool m_isSeeking = false;
+  std::chrono::time_point<std::chrono::steady_clock> m_lastSeekActionTime;
 };

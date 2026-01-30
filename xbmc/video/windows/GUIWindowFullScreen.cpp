@@ -30,6 +30,7 @@
 #include "video/ViewModeSettings.h"
 #include "video/dialogs/GUIDialogFullScreenInfo.h"
 #include "video/dialogs/GUIDialogSubtitleSettings.h"
+#include "cores/VideoPlayer/DVDInputStreams/DVDInputStreamBluray.h"
 #include "windowing/WinSystem.h"
 #include "dialogs/GUIDialogYesNo.h"
 #include "utils/log.h"
@@ -70,13 +71,17 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
   auto& components = CServiceBroker::GetAppComponents();
   const auto appPlayer = components.GetComponent<CApplicationPlayer>();
   bool hasMenu = appPlayer->IsInMenu();
-
+  
+  CDVDInputStream* pInputStream = appPlayer->GetInputStream();
+  auto pBlurayStream = dynamic_cast<CDVDInputStreamBluray*>(pInputStream);
+  bool isBlurayMenu = pBlurayStream && pBlurayStream->IsInMenu();
+  
   switch (action.GetID())
   {
   case ACTION_MOVE_LEFT:
   case ACTION_MOVE_RIGHT:
     {
-      if (hasMenu)
+      if (!isBlurayMenu)
       {
         InitiateSeek(action.GetID() == ACTION_MOVE_RIGHT);
         return true; 

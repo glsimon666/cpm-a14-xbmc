@@ -72,15 +72,24 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
   const auto appPlayer = components.GetComponent<CApplicationPlayer>();
   bool hasMenu = appPlayer->IsInMenu();
   
-  CDVDInputStream* pInputStream = appPlayer->GetInputStream();
-  auto pBlurayStream = dynamic_cast<CDVDInputStreamBluray*>(pInputStream);
-  bool isBlurayMenu = pBlurayStream && pBlurayStream->IsInMenu();
-  
   switch (action.GetID())
   {
   case ACTION_MOVE_LEFT:
   case ACTION_MOVE_RIGHT:
     {
+      bool isBlurayMenu = false;
+      if (appPlayer != nullptr)
+      {
+        CDVDInputStream* pInputStream = appPlayer->GetInputStream();
+        if (pInputStream != nullptr)
+        {
+          auto pBlurayStream = dynamic_cast<CDVDInputStreamBluray*>(pInputStream);
+          if (pBlurayStream != nullptr)
+          {
+            isBlurayMenu = pBlurayStream->IsInMenu();
+          }
+        }
+      }
       if (!isBlurayMenu)
       {
         InitiateSeek(action.GetID() == ACTION_MOVE_RIGHT);

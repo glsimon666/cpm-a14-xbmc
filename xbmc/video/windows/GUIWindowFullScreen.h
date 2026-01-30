@@ -38,7 +38,7 @@ private:
   void TriggerOSD();
   CGUIDialog *GetOSD();
   
-  // 新增 Seek 处理逻辑
+  // Seek Logic Methods
   void InitiateSeek(bool forward);
   void ExecuteSeek();
 
@@ -47,7 +47,7 @@ private:
 
   bool m_bShowCurrentTime;
 
-  // 新增 Seek 控制变量
+  // Seek Control Variables
   bool m_isSeeking = false;
   std::chrono::time_point<std::chrono::steady_clock> m_lastSeekActionTime;
 };

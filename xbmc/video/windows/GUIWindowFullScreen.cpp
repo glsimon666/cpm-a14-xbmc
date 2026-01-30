@@ -16,6 +16,7 @@
 #include "application/ApplicationComponents.h"
 #include "application/ApplicationPlayer.h"
 #include "cores/IPlayer.h"
+#include "SeekHandler.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
@@ -72,12 +73,12 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
 
   switch (action.GetID())
   {
-  case ACTION_NAV_LEFT:
-  case ACTION_NAV_RIGHT:
+  case ACTION_MOVE_LEFT:
+  case ACTION_MOVE_RIGHT:
     {
-      if (!hasMenu)
+      if (hasMenu)
       {
-        InitiateSeek(action.GetID() == ACTION_NAV_RIGHT);
+        InitiateSeek(action.GetID() == ACTION_MOVE_RIGHT);
         return true; 
       }
       break;
@@ -206,29 +207,13 @@ void CGUIWindowFullScreen::InitiateSeek(bool forward)
   const auto appPlayer = components.GetComponent<CApplicationPlayer>();
   auto now = std::chrono::steady_clock::now();
 
-  // 检查是否已经在 Seek 状态中
-  if (m_isSeeking)
-  {
-    // 计算距离上一次按键指令的时间间隔
-    auto interval = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lastSeekActionTime).count();
-    
-    // 如果间隔小于 150ms（通常是长按时的重复指令），我们只更新时间戳而不增加偏移
-    // 这样可以防止长按时进度条跑得太快，同时重置 500ms 的倒计时
-    if (interval < 150)
-    {
-      m_lastSeekActionTime = now;
-      return;
-    }
-  }
-
-  // 调用 SeekHandler 的 Seek 方法，这会更新内部的 SeekAmount
-  // 从而让 GUIDialogSeekBar 中的 PLAYER_SEEKBAR 标签产生变化
+  // 第三个参数 false 表示“相对偏移”，确保它是在当前进度上累加
   appPlayer->GetSeekHandler().Seek(forward, false, false);
   
   m_isSeeking = true;
   m_lastSeekActionTime = now;
 
-  // 确保 SeekBar 对话框打开以显示进度
+  // 确保 SeekBar 对话框打开
   CGUIDialog* pSeekBar = CServiceBroker::GetGUI()->GetWindowManager().GetDialog(WINDOW_DIALOG_SEEK_BAR);
   if (pSeekBar && !pSeekBar->IsDialogRunning())
   {
@@ -242,7 +227,7 @@ void CGUIWindowFullScreen::ExecuteSeek()
   const auto appPlayer = components.GetComponent<CApplicationPlayer>();
 
   // 执行真正的跳转
-  appPlayer->GetSeekHandler().Execute();
+  appPlayer->GetSeekHandler().Configure();
   
   m_isSeeking = false;
 }
@@ -260,7 +245,7 @@ void CGUIWindowFullScreen::FrameMove()
     auto now = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lastSeekActionTime).count();
     
-    if (elapsed > 500) // 超过500ms未再次按键，执行Seek
+    if (elapsed > 1000) // 超过1s未再次按键，执行Seek
     {
       ExecuteSeek();
     }

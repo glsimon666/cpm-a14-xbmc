@@ -23,7 +23,7 @@
         </setting>
         <setting id="videoplayer.seeksteps" type="list[integer]" label="13556" help="37042">
           <level>1</level>
-          <default>-600,-300,-180,-60,-30,-10,10,30,60,180,300,600</default>
+          <default>-10,10</default>
           <constraints>
             <options>videoseeksteps</options>
             <delimiter>,</delimiter>

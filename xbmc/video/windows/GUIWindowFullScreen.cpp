@@ -9,6 +9,7 @@
 #include "GUIWindowFullScreen.h"
 
 #include "FileItem.h"
+#include "cores/IPlayer.h"
 #include "GUIInfoManager.h"
 #include "GUIWindowFullScreenDefines.h"
 #include "ServiceBroker.h"
@@ -70,16 +71,14 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
 {
   auto& components = CServiceBroker::GetAppComponents();
   const auto appPlayer = components.GetComponent<CApplicationPlayer>();
-  bool hasMenu = appPlayer->IsInMenu();
+  bool hasMenu = (appPlayer->GetSupportedMenuType() != MenuType::NONE);
   
   switch (action.GetID())
   {
   case ACTION_MOVE_LEFT:
   case ACTION_MOVE_RIGHT:
     {
-
-      int activeWindowID = CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindow();
-      bool isBlurayMenu = (activeWindowID == WINDOW_VIDEO_MENU);
+      bool isBlurayMenu = appPlayer->IsInMenu();
       if (!isBlurayMenu)
       {
         InitiateSeek(action.GetID() == ACTION_MOVE_RIGHT);
@@ -90,31 +89,23 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
 
   case ACTION_NAV_BACK:
     {
-      if (hasMenu)
+      auto pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
+      if (pDialog)
       {
-        auto pDialog = CServiceBroker::GetGUI()->GetWindowManager().GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
-        if (pDialog)
-        {
-          pDialog->SetHeading(CVariant{"CoreELEC"});
-          pDialog->SetLine(0, CVariant{"Do you want to exit the current video?"});
-          pDialog->SetLine(1, CVariant{""});
-          pDialog->SetLine(2, CVariant{""});
-          pDialog->Open();
-
-          if (pDialog->IsConfirmed())
-            g_application.StopPlaying();
-
-          return true;
-        }
+        pDialog->SetHeading(CVariant{"CoreELEC"});
+        pDialog->SetLine(0, CVariant{"Do you want to exit the current video?"});
+        pDialog->SetLine(1, CVariant{""});
+        pDialog->SetLine(2, CVariant{""});
+        pDialog->Open();
+        if (pDialog->IsConfirmed())
+          g_application.StopPlaying();
+        return true;
       }
       break;
     }
   case ACTION_SHOW_OSD:
     {
-      bool isFullscreenVideo = CServiceBroker::GetWinSystem()->GetGfxContext().IsFullScreenVideo();
-      bool playerHasMenu = appPlayer->IsInMenu();
-      
-      if (isFullscreenVideo && playerHasMenu)
+      if (hasMenu)
       {
         appPlayer->OnAction(CAction(ACTION_SHOW_VIDEOMENU));
       }

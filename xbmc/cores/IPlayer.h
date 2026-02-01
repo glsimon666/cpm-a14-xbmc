@@ -123,6 +123,8 @@ public:
   virtual void SetSubtitle(int iStream) {}
   virtual bool GetSubtitleVisible() const { return false; }
   virtual void SetSubtitleVisible(bool bVisible) {}
+  
+  virtual CDVDInputStream* GetInputStream() const { return nullptr; }
 
   /*!
    * \brief Set the subtitle vertical position,

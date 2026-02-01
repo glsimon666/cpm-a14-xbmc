@@ -60,6 +60,7 @@ CGUIWindowFullScreen::CGUIWindowFullScreen()
   m_controlStats = new GUICONTROLSTATS;
   
   m_isSeeking = false;
+  m_ismenuon = true;
 }
 
 CGUIWindowFullScreen::~CGUIWindowFullScreen(void)
@@ -78,11 +79,26 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
   case ACTION_MOVE_LEFT:
   case ACTION_MOVE_RIGHT:
     {
-      bool isBlurayMenu = appPlayer->IsInMenu();
-      if (!isBlurayMenu)
+      if (m_ismenuon)
+      {
+        bool blurayStreamMenu = false;
+        CDVDInputStream* pStream = appPlayer->GetInputStream();
+        if (pStream && pStream->IsType(DVDSTREAM_TYPE_BLURAY))
+        {
+          auto pBluray = static_cast<CDVDInputStreamBluray*>(pStream);
+          blurayStreamMenu = pBluray->IsMenuOn();
+        }
+
+        if (!blurayStreamMenu || !hasMenu)
+        {
+          m_ismenuon = false;
+        }
+      }
+
+      if (!m_ismenuon)
       {
         InitiateSeek(action.GetID() == ACTION_MOVE_RIGHT);
-        return true; 
+        return true;
       }
       break;
     }
@@ -225,6 +241,7 @@ void CGUIWindowFullScreen::ExecuteSeek()
   appPlayer->GetSeekHandler().Configure();
   
   m_isSeeking = false;
+  m_ismenuon = true;
 }
 
 void CGUIWindowFullScreen::FrameMove()

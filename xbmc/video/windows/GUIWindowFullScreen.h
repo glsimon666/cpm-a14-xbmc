@@ -46,6 +46,8 @@ private:
   std::chrono::time_point<std::chrono::steady_clock> m_dwShowViewModeTimeout;
 
   bool m_bShowCurrentTime;
+  
+  bool m_ismenuon;
 
   // Seek Control Variables
   bool m_isSeeking = false;

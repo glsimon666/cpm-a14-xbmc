@@ -276,6 +276,8 @@ public:
   void SetAVDelay(float fValue = 0.0f) override;
   float GetAVDelay() override;
   bool IsInMenu() const override;
+  
+  CDVDInputStream* GetInputStream() const override { return m_pInputStream.get(); }
 
   /*!
    * \brief Get the supported menu type

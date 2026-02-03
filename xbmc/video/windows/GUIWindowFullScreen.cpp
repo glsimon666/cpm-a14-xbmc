@@ -79,27 +79,23 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
   case ACTION_MOVE_LEFT:
   case ACTION_MOVE_RIGHT:
     {
+      // ===== 核心修改：按要求重构m_ismenuon判断逻辑 =====
       if (m_ismenuon)
       {
-        bool blurayStreamMenu = false;
-        CDVDInputStream* pStream = appPlayer->GetInputStream();
-        if (pStream && pStream->IsType(DVDSTREAM_TYPE_BLURAY))
-        {
-          auto pBluray = static_cast<CDVDInputStreamBluray*>(pStream);
-          blurayStreamMenu = pBluray->IsMenuOn();
-        }
-
-        if (!blurayStreamMenu || !hasMenu)
+        // 状态变量为true时，检测全局isinmenu是否为false，是则置为false
+        if (!appPlayer->IsInMenu())
         {
           m_ismenuon = false;
+          CLog::Log(LOGDEBUG, "CGUIWindowFullScreen::OnAction - IsInMenu is false, set m_ismenuon to false");
         }
       }
-
+      // 状态变量为false时，执行快速seek逻辑
       if (!m_ismenuon)
       {
         InitiateSeek(action.GetID() == ACTION_MOVE_RIGHT);
         return true;
       }
+      // ===================================================
       break;
     }
 

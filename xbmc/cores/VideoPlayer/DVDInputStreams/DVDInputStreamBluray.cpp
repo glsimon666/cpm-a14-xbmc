@@ -1202,6 +1202,20 @@ bool CDVDInputStreamBluray::OnMenu()
   // internal tracking state would be wrong. So just process and return.
   if(bd_user_input(m_bd, -1, BD_VK_POPUP) >= 0)
   {
+    // ===== 新增：Popup 菜单触发时的 m_menu 逻辑 =====
+    CLog::Log(LOGDEBUG, "CDVDInputStreamBluray::OnMenu - popup menu triggered, m_isInMainMenu: {}, old m_menu: {}", m_isInMainMenu, m_menu);
+    if (m_isInMainMenu)
+    {
+      // 若处于根菜单状态，直接将 m_menu 设为 true
+      m_menu = true;
+    }
+    else
+    {
+      // 非根菜单状态：m_menu 为 false 则设为 true，为 true 则设为 false
+      m_menu = !m_menu;
+    }
+    CLog::Log(LOGDEBUG, "CDVDInputStreamBluray::OnMenu - popup menu m_menu updated to: {}", m_menu);
+    // ==============================================
     return true;
   }
 

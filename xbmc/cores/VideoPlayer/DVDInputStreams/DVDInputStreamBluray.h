@@ -68,8 +68,6 @@ public:
   int64_t GetLength() override;
   int GetBlockSize() override { return 6144; }
   ENextStream NextStream() override;
-  
-  bool IsMenuOn() const { return m_menu; }
 
 
   /* IMenus */

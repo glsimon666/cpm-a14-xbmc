@@ -79,7 +79,6 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
   case ACTION_MOVE_LEFT:
   case ACTION_MOVE_RIGHT:
     {
-      // ===== 核心修改：按要求重构m_ismenuon判断逻辑 =====
       if (m_ismenuon)
       {
         // 状态变量为true时，检测全局isinmenu是否为false，是则置为false
@@ -93,7 +92,7 @@ bool CGUIWindowFullScreen::OnAction(const CAction &action)
       if (!m_ismenuon)
       {
         InitiateSeek(action.GetID() == ACTION_MOVE_RIGHT);
-        return true;
+        return true; 
       }
       // ===================================================
       break;

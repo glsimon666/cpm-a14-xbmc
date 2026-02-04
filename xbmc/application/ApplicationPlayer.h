@@ -70,11 +70,6 @@ public:
   bool RenderCaptureGetPixels(unsigned int captureId, unsigned int millis, uint8_t *buffer, unsigned int size);
   bool IsExternalPlaying() const;
   bool IsRemotePlaying() const;
-  
-  CDVDInputStream* GetInputStream() const
-  {
-    return m_pPlayer ? m_pPlayer->GetInputStream() : nullptr;
-  }
 
   /*!
    * \brief Get the name of the player in use

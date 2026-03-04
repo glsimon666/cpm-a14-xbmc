@@ -65,4 +65,6 @@ protected:
 
   GLint m_sdrPeak;
   GLint m_sdrSaturation;
+  GLint m_hdrPgsPeak;
+  GLint m_hdrPgsSaturation;
 };

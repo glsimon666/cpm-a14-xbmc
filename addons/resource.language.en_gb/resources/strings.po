@@ -24079,6 +24079,68 @@ msgctxt "#39302"
 msgid "to profile 8.1"
 msgstr ""
 
+#. Help text for setting of label #39204
+#: system/settings/settings.xml
+msgctxt "#39205"
+msgid "By enabling it, CC subtitles will be labeled for the hearing impaired; this will affect the automatic selection of subtitles, which unless otherwise specified will not be displayed by default."
+msgstr ""
+
+#. Abbreviation for Closed Caption subtitles (subtitles embedded in videos)
+#: xbmc/cores/VideoPlayer/DVDDemuxers/DVDDemuxCC.cpp
+msgctxt "#39206"
+msgid "CC"
+msgstr ""
+
+# Use Starfish decoder
+#: system/settings/linux.xml
+msgctxt "#39207"
+msgid "Use Starfish decoder"
+msgstr ""
+
+#. Description of setting with label #39207 "Use Starfish decoder"
+#: system/settings/linux.xml
+msgctxt "#39208"
+msgid "Starfish is the hardware video decoder for LG's webOS. Disable it for troubleshooting or testing."
+msgstr ""
+
+#. Title of Dolby Vision level 5 metadata zero override setting
+#: system/settings/settings.xml
+msgctxt "#39209"
+msgid "Dolby Vision: Override level 5 metadata to zero"
+msgstr ""
+
+#. Help text for setting "Dolby Vision: Override level 5 metadata to zero" of label #39209
+#: system/settings/settings.xml
+msgctxt "#39210"
+msgid "If enabled, Dolby Vision files will have level 5 (active area) metadata overridden to zero offsets. Enable if your display has issues with incorrectly cropped image in Dolby Vision playback."
+msgstr ""
+
+#. Label for HDR-authored PGS subtitle luminance setting
+#: system/settings/settings.xml
+msgctxt "#39211"
+msgid "HDR PGS subtitle luminance"
+msgstr ""
+
+#. Help text for setting "HDR PGS subtitle luminance" of label #39211
+#: system/settings/settings.xml
+msgctxt "#39212"
+msgid "Adjusts brightness for HDR-authored PGS subtitles (BT.2020/PQ). 50% keeps source luminance unchanged."
+msgstr ""
+
+#. Label for HDR-authored PGS subtitle saturation setting
+#: system/settings/settings.xml
+msgctxt "#39213"
+msgid "HDR PGS subtitle saturation"
+msgstr ""
+
+#. Help text for setting "HDR PGS subtitle saturation" of label #39213
+#: system/settings/settings.xml
+msgctxt "#39214"
+msgid "Adjusts color intensity for HDR-authored PGS subtitles (BT.2020/PQ). 50% keeps source saturation unchanged."
+msgstr ""
+
+#empty strings from id 39215 to 39999
+
 # 40000 to 40800 are reserved for Video Versions feature
 
 #. Generic video versions label (plural)

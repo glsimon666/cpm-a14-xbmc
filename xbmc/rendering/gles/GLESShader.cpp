@@ -175,10 +175,11 @@ bool CGLESShader::OnEnabled()
   glUniform1f(m_hBrightness, 0.0f);
   glUniform1f(m_hContrast, 1.0f);
 
-  const float sdrPeak = CServiceBroker::GetWinSystem()->GetGuiSdrPeakLuminance();
+  const auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
+  const float sdrPeak = static_cast<float>(settings->GetInt("videoscreen.hdrpgspeakluminance"));
   glUniform1f(m_sdrPeak, sdrPeak);
 
-  const float sdrSaturation = CServiceBroker::GetWinSystem()->GetGuiSdrSaturation();
+  const float sdrSaturation = static_cast<float>(settings->GetInt("videoscreen.guisdrsaturation")) / 50.0f;
   glUniform1f(m_sdrSaturation, sdrSaturation);
 
   const auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();

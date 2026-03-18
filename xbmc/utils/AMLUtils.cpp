@@ -723,7 +723,7 @@ void aml_set_osd_pq_bypass(StreamHdrType hdrType)
                        (hdrType == StreamHdrType::HDR_TYPE_HDR10PLUS));
 
   CSysfsPath("/sys/module/am_vecm/parameters/osd_pq_bypass", enable);
-  logM(LOGINFO, "AMLUtils", "am_vecm osd_pq_bypass [{}]", enable ? "enabled" : "disabled");
+  CLog::Log(LOGINFO, "AMLUtils", "am_vecm osd_pq_bypass [{}]", enable ? "enabled" : "disabled");
 }
 
 void aml_set_transfer_pq(StreamHdrType hdrType, unsigned int bitDepth) {

@@ -707,3 +707,16 @@ GLint CRenderSystemGLES::GUIShaderGetModel()
 
   return -1;
 }
+
+namespace KODI::GLES
+{
+bool UsesFixedAttributeLocationsForShader(const std::string& vertexShaderName)
+{
+  const auto renderSystem = dynamic_cast<CRenderSystemGLES*>(CServiceBroker::GetRenderSystem());
+  if (!renderSystem || vertexShaderName.empty())
+    return false;
+
+  const std::string shaderPath = renderSystem->GetShaderPath(vertexShaderName);
+  return shaderPath == "GLES/3.1/" || shaderPath == "GLES/3.2/";
+}
+}

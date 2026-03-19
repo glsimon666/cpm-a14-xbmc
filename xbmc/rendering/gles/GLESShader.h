@@ -9,14 +9,17 @@
 #pragma once
 
 #include "guilib/Shader.h"
+#include "settings/lib/ISettingCallback.h"
 
 #include <string>
 
-class CGLESShader : public Shaders::CGLSLShaderProgram
+class CGLESShader : public Shaders::CGLSLShaderProgram, public ISettingCallback
 {
 public:
   CGLESShader(const char* shader, const std::string& prefix);
   CGLESShader(const char* vshader, const char* fshader, const std::string& prefix);
+  ~CGLESShader() override;
+  
   void OnCompiledAndLinked() override;
   bool OnEnabled() override;
   void Free();
@@ -37,13 +40,17 @@ public:
   GLfloat GetClipXOffset() { return m_clipXOffset; }
   GLfloat GetClipYFactor() { return m_clipYFactor; }
   GLfloat GetClipYOffset() { return m_clipYOffset; }
-
+  
+  void OnSettingChanged(const std::shared_ptr<const CSetting>& setting) override;
 protected:
   GLint m_hTex0 = 0;
   GLint m_hTex1 = 0;
   GLint m_hUniCol = 0;
   GLint m_hProj = 0;
   GLint m_hModel = 0;
+  GLint m_hMatrix{0}; // m_hProj * m_hModel
+  GLint m_hShaderClip{0}; // clipping rect vec4(x1,y1,x2,y2)
+  GLint m_hCoordStep{0}; // step (1/resolution) for the two textures vec4(t1.x,t1.y,t2.x,t2.y)
   GLint m_hPos = 0;
   GLint m_hCol = 0;
   GLint m_hCord0 = 0;
@@ -53,6 +60,11 @@ protected:
   GLint m_hStep = 0;
   GLint m_hContrast = 0;
   GLint m_hBrightness = 0;
+  GLint m_hDepth = 0;
+  GLint m_hVertexBlock = -1;
+  GLint m_hFragmentBlock = -1;
+  GLuint m_vertexUBO = 0;
+  GLuint m_fragmentUBO = 0;
 
   const GLfloat *m_proj;
   const GLfloat *m_model;
@@ -67,4 +79,9 @@ protected:
   GLint m_sdrSaturation;
   GLint m_hdrPgsPeak;
   GLint m_hdrPgsSaturation;
+  
+  float m_cachedGuiSdrPeak = 0.0f;
+  float m_cachedGuiSdrSaturation = 1.0f;
+  float m_cachedHdrPgsPeak = 1.0f;
+  float m_cachedHdrPgsSaturation = 1.0f;
 };

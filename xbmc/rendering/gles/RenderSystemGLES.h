@@ -143,3 +143,8 @@ protected:
 
   GLint      m_viewPort[4];
 };
+
+namespace KODI::GLES
+{
+bool UsesFixedAttributeLocationsForShader(const std::string& vertexShaderName);
+}

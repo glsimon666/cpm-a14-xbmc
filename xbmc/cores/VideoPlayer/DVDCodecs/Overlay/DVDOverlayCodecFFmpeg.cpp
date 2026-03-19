@@ -319,7 +319,10 @@ std::shared_ptr<CDVDOverlay> CDVDOverlayCodecFFmpeg::GetOverlay()
     {
       // UHD-BD PGS subtitles for HDR content are authored as BT.2020 + ST2084 code values
       // Treat them as already PQ-coded to avoid applying GUI PQ conversion a second time during composition.
-      overlay->m_isHdrPq = CServiceBroker::GetWinSystem()->GetGfxContext().IsTransferPQ();;
+      // Don't key this off IsTransferPQ()/HDRType here: at playback start the renderer may not have
+      // established PQ output yet, leading to the first subtitle(s) using the wrong composition path.
+      // We mark the overlay as a PQ-bypass candidate and decide at render time based on output state.
+      overlay->m_isHdrPq = m_pgsIsPqAuthored;
     }
 
     m_SubtitleIndex++;

@@ -61,4 +61,9 @@ protected:
 
 private:
   std::unique_ptr<CDolbyVisionAML> m_dolbyVisionAML;
+
+  mutable float m_cachedSdrWhiteNits = 1.0f;
+  mutable float m_cachedGuiSaturation = 1.0f;
+  mutable int   m_lastGuiSdrPeakSetting = -1;       // 记录上次设置的整数值
+  mutable int   m_lastGuiSaturationSetting = -1;
 };

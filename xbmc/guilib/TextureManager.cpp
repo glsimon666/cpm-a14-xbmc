@@ -457,7 +457,6 @@ const CTextureArray& CGUITextureManager::Load(const std::string& strTextureName,
   CTextureMap* pMap = new CTextureMap(strTextureName, width, height, 0);
   pMap->Add(std::move(pTexture), 100);
   m_vecTextures.push_back(pMap);
-  m_textureIndex[pMap->GetName()] = pMap;
 
 #ifdef _DEBUG_TEXTURES
   const auto end = std::chrono::steady_clock::now();
@@ -491,7 +490,6 @@ void CGUITextureManager::ReleaseTexture(const std::string& strTextureName, bool 
           timestamp = std::chrono::steady_clock::now();
 
         m_unusedTextures.emplace_back(pMap, timestamp);
-        m_textureIndex.erase(pMap->GetName());
         i = m_vecTextures.erase(i);
       }
       return;
@@ -553,7 +551,6 @@ void CGUITextureManager::Cleanup()
     delete pMap;
     i = m_vecTextures.erase(i);
   }
-  m_textureIndex.clear();
   m_TexBundle[0].Close();
   m_TexBundle[1].Close();
   m_TexBundle[0] = CTextureBundle(true);
@@ -585,7 +582,6 @@ void CGUITextureManager::Flush()
     pMap->Flush();
     if (pMap->IsEmpty() )
     {
-      m_textureIndex.erase(pMap->GetName());
       delete pMap;
       i = m_vecTextures.erase(i);
     }

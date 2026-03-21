@@ -63,7 +63,6 @@ void CRenderer::AddOverlay(std::shared_ptr<CDVDOverlay> o, double pts, int index
   e.pts = pts;
   e.overlay_dvd = std::move(o);
   m_buffers[index].push_back(e);
-  m_overlayCount[index].fetch_add(1, std::memory_order_relaxed);
 }
 
 void CRenderer::Release(std::vector<SElement>& list)
@@ -87,12 +86,8 @@ void CRenderer::Flush()
 {
   std::unique_lock<CCriticalSection> lock(m_section);
 
-  for (unsigned int i = 0; i < NUM_BUFFERS; ++i)
-  {
-    Release(m_buffers[i]);
-    m_overlayCount[i].store(0, std::memory_order_relaxed);
-  }
-  m_buffersChanged.store(true, std::memory_order_relaxed);
+  for(std::vector<SElement>& buffer : m_buffers)
+    Release(buffer);
 
   ReleaseCache();
   Reset();
@@ -108,9 +103,6 @@ void CRenderer::Release(int idx)
 {
   std::unique_lock<CCriticalSection> lock(m_section);
   Release(m_buffers[idx]);
-  
-  m_overlayCount[idx].store(0, std::memory_order_relaxed);
-  m_buffersChanged.store(true, std::memory_order_relaxed);
 }
 
 void CRenderer::ReleaseCache()
@@ -149,7 +141,6 @@ void CRenderer::ReleaseUnused()
 void CRenderer::Render(int idx)
 {
   std::unique_lock<CCriticalSection> lock(m_section);
-  const bool pruneCache = m_buffersChanged.exchange(false, std::memory_order_relaxed);
 
   std::vector<SElement>& list = m_buffers[idx];
   for(std::vector<SElement>::iterator it = list.begin(); it != list.end(); ++it)
@@ -163,8 +154,7 @@ void CRenderer::Render(int idx)
     }
   }
 
-  if (pruneCache)
-    ReleaseUnused();
+  ReleaseUnused();
 }
 
 void CRenderer::Render(COverlay* o)
@@ -258,7 +248,20 @@ void CRenderer::Render(COverlay* o)
 
 bool CRenderer::HasOverlay(int idx)
 {
-  return m_overlayCount[idx].load(std::memory_order_relaxed) != 0;
+  bool hasOverlay = false;
+
+  std::unique_lock<CCriticalSection> lock(m_section);
+
+  std::vector<SElement>& list = m_buffers[idx];
+  for(std::vector<SElement>::iterator it = list.begin(); it != list.end(); ++it)
+  {
+    if (it->overlay_dvd)
+    {
+      hasOverlay = true;
+      break;
+    }
+  }
+  return hasOverlay;
 }
 
 void CRenderer::SetVideoRect(CRect &source, CRect &dest, CRect &view)

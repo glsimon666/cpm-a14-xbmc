@@ -20,7 +20,6 @@
 #include <map>
 #include <memory>
 #include <vector>
-#include <array>
 
 typedef struct ass_image ASS_Image;
 
@@ -183,8 +182,6 @@ namespace OVERLAY {
 
     CCriticalSection m_section;
     std::vector<SElement> m_buffers[NUM_BUFFERS];
-    std::array<std::atomic_uint, NUM_BUFFERS> m_overlayCount{};
-    std::atomic_bool m_buffersChanged{false};
     std::map<unsigned int, std::shared_ptr<COverlay>> m_textureCache;
     static unsigned int m_textureid;
     CRect m_rv; // Frame size

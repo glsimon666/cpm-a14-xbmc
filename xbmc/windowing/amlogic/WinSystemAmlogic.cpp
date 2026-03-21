@@ -335,13 +335,20 @@ float CWinSystemAmlogic::GetGuiSdrPeakLuminance() const
 float CWinSystemAmlogic::GetGuiSdrSaturation() const
 {
   const auto settings = CServiceBroker::GetSettingsComponent()->GetSettings();
-
-  // UI is 0..100, where 50 is neutral. Map to shader saturation factor 0..2.
   const int satClamped = std::clamp(settings->GetInt(CSettings::SETTING_VIDEOSCREEN_GUISDRSATURATION), 0, 100);
 
-  float saturation = static_cast<float>(satClamped) / 50.0f;
+  // 增加一个简单的缓存检查
+  if (satClamped == m_lastSaturationSetting)
+  {
+    return m_cachedSaturation;
+  }
 
-  return std::clamp(saturation, 0.0f, 2.0f);
+  // 只有在滑块变动时才计算
+  float saturation = static_cast<float>(satClamped) / 50.0f;
+  m_cachedSaturation = std::clamp(saturation, 0.0f, 2.0f);
+  m_lastSaturationSetting = satClamped;
+
+  return m_cachedSaturation;
 }
 
 bool CWinSystemAmlogic::Hide()

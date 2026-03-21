@@ -338,17 +338,17 @@ float CWinSystemAmlogic::GetGuiSdrSaturation() const
   const int satClamped = std::clamp(settings->GetInt(CSettings::SETTING_VIDEOSCREEN_GUISDRSATURATION), 0, 100);
 
   // 增加一个简单的缓存检查
-  if (satClamped == m_lastSaturationSetting)
+  if (satClamped == m_lastGuiSaturationSetting)
   {
-    return m_cachedSaturation;
+    return m_cachedGuiSaturation;
   }
 
   // 只有在滑块变动时才计算
   float saturation = static_cast<float>(satClamped) / 50.0f;
-  m_cachedSaturation = std::clamp(saturation, 0.0f, 2.0f);
-  m_lastSaturationSetting = satClamped;
+  m_cachedGuiSaturation = std::clamp(saturation, 0.0f, 2.0f);
+  m_lastGuiSaturationSetting = satClamped;
 
-  return m_cachedSaturation;
+  return m_cachedGuiSaturation;
 }
 
 bool CWinSystemAmlogic::Hide()

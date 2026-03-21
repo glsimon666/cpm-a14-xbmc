@@ -440,11 +440,13 @@ void COverlayTextureGLES::Render(SRenderState& state)
     rd.SetRect(left, top, right, bottom);
   }
 
-  CRenderSystemGLES* renderSystem =
+  auto renderSystem =
       dynamic_cast<CRenderSystemGLES*>(CServiceBroker::GetRenderSystem());
 
-  renderSystem->EnableGUIShader(m_bypassTransferPQ ? ShaderMethodGLES::SM_TEXTURE_NOBLEND_NO_PQ
-                                                   : ShaderMethodGLES::SM_TEXTURE_NOBLEND);
+  const bool bypassTransferPQ = m_isHdrPqAuthored &&
+                                CServiceBroker::GetWinSystem()->GetGfxContext().IsTransferPQ();
+  renderSystem->EnableGUIShader(bypassTransferPQ ? ShaderMethodGLES::SM_TEXTURE_NOBLEND_NO_PQ
+                                                 : ShaderMethodGLES::SM_TEXTURE_NOBLEND);
   GLint posLoc = renderSystem->GUIShaderGetPos();
   GLint colLoc = renderSystem->GUIShaderGetCol();
   GLint tex0Loc = renderSystem->GUIShaderGetCoord0();

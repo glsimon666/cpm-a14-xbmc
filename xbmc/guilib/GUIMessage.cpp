@@ -10,7 +10,7 @@
 
 #include "LocalizeStrings.h"
 
-const std::string CGUIMessage::empty_string;
+std::string CGUIMessage::empty_string;
 
 CGUIMessage::CGUIMessage(int msg, int senderID, int controlID, int64_t param1, int64_t param2)
 {

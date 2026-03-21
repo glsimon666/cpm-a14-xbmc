@@ -56,7 +56,7 @@ CTextureArray::CTextureArray(int width, int height, int loops,  bool texCoordsAr
   m_orientation = 0;
   m_texWidth = 0;
   m_texHeight = 0;
-  m_texCoordsArePixels = texCoordsArePixels;
+  m_texCoordsArePixels = false;
 }
 
 CTextureArray::CTextureArray()
@@ -194,9 +194,9 @@ void CTextureMap::SetHeight(int height)
   m_texture.m_height = height;
 }
 
-void CTextureMap::SetWidth(int width)
+void CTextureMap::SetWidth(int height)
 {
-  m_texture.m_width = width;
+  m_texture.m_width = height;
 }
 
 bool CTextureMap::IsEmpty() const
@@ -258,11 +258,14 @@ bool CGUITextureManager::HasTexture(const std::string &textureName, std::string 
 
   // Check our loaded and bundled textures - we store in bundles using \\.
   std::string bundledName = CTextureBundle::Normalize(textureName);
-  const auto it = m_textureIndex.find(textureName);
-  if (it != m_textureIndex.end())
+  for (int i = 0; i < (int)m_vecTextures.size(); ++i)
   {
-    if (size) *size = 1;
-    return true;
+    CTextureMap *pMap = m_vecTextures[i];
+    if (pMap->GetName() == textureName)
+    {
+      if (size) *size = 1;
+      return true;
+    }
   }
 
   for (int i = 0; i < 2; i++)
@@ -296,8 +299,7 @@ const CTextureArray& CGUITextureManager::Load(const std::string& strTextureName,
 
   if (size) // we found the texture
   {
-    const auto it = m_textureIndex.find(strTextureName);
-    if (it != m_textureIndex.end())
+    for (int i = 0; i < (int)m_vecTextures.size(); ++i)
     {
       CTextureMap *pMap = m_vecTextures[i];
       if (pMap->GetName() == strTextureName)
@@ -320,7 +322,6 @@ const CTextureArray& CGUITextureManager::Load(const std::string& strTextureName,
     if (pMap->GetName() == strTextureName && duration.count() > 0)
     {
       m_vecTextures.push_back(pMap);
-      m_textureIndex[pMap->GetName()] = pMap;
       m_unusedTextures.erase(i);
       return pMap->GetTexture();
     }
@@ -365,7 +366,6 @@ const CTextureArray& CGUITextureManager::Load(const std::string& strTextureName,
     pMap->SetHeight((int)maxHeight);
 
     m_vecTextures.push_back(pMap);
-    m_textureIndex[pMap->GetName()] = pMap;
     return pMap->GetTexture();
   }
   else if (StringUtils::EndsWithNoCase(strPath, ".gif") ||
@@ -424,7 +424,6 @@ const CTextureArray& CGUITextureManager::Load(const std::string& strTextureName,
     file.Close();
 
     m_vecTextures.push_back(pMap);
-    m_textureIndex[pMap->GetName()] = pMap;
     return pMap->GetTexture();
   }
 

@@ -378,28 +378,3 @@ void CGLESShader::Free()
 
   CGLSLShaderProgram::Free();
 }
-
-void CGLSLShaderProgram::ApplyPQSettings(float sdrPeak, float sdrSaturation)
-{
-    // 1. 只有在第一次使用时上传纹理
-    static GLuint lutTexture = 0;
-    if (lutTexture == 0) {
-        glGenTextures(1, &lutTexture);
-        glBindTexture(GL_TEXTURE_2D, lutTexture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1024, 32, 0, GL_RGB, GL_UNSIGNED_BYTE, g_solidifiedPQLut);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    }
-
-    // 2. 判断是否为默认值（Peak=100nits对应1.0f，Saturation默认1.0f）[cite: 18, 412]
-    bool useLut = (std::abs(sdrPeak - 1.0f) < 0.001f && std::abs(sdrSaturation - 1.0f) < 0.001f);
-
-    // 3. 绑定 Uniforms
-    glActiveTexture(GL_TEXTURE3); // 假设使用槽位 3
-    glBindTexture(GL_TEXTURE_2D, lutTexture);
-    SetUniform("m_lutSampler", 3);
-    SetUniform("m_useLut", useLut ? 1.0f : 0.0f);
-    glActiveTexture(GL_TEXTURE0);
-}

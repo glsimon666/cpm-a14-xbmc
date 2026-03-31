@@ -8,6 +8,8 @@
 
 #include "GLESShader.h"
 
+#include "PQLutData.h"
+
 #include <algorithm>
 
 #include "ServiceBroker.h"
@@ -37,8 +39,8 @@ struct GuiVertexBlockData
 
 struct GuiFragmentBlockData
 {
-  std::array<GLfloat, 4> guiParams0{};
-  std::array<GLfloat, 4> guiParams1{};
+  std::array<GLfloat, 4> guiParams0{}; // [brightness, contrast, sdrPeak, sdrSaturation]
+  std::array<GLfloat, 4> guiParams1{}; // [hdrPgsPeak, hdrPgsSaturation, useLut, dummy]
 };
 
 void EnsureGuiUniformBuffer(GLuint& buffer, GLsizeiptr size)
@@ -90,6 +92,8 @@ void CGLESShader::OnCompiledAndLinked()
   m_hBrightness = glGetUniformLocation(ProgramHandle(), "m_brightness");
   m_sdrPeak = glGetUniformLocation(ProgramHandle(), "m_sdrPeak");
   m_sdrSaturation = glGetUniformLocation(ProgramHandle(), "m_sdrSaturation");
+  m_hLutSampler = glGetUniformLocation(ProgramHandle(), "m_lutSampler");
+  m_hUseLut = glGetUniformLocation(ProgramHandle(), "m_useLut");
   m_hdrPgsPeak = glGetUniformLocation(ProgramHandle(), "m_hdrPgsPeak");
   m_hdrPgsSaturation = glGetUniformLocation(ProgramHandle(), "m_hdrPgsSaturation");
 
@@ -207,6 +211,31 @@ void CGLESShader::OnSettingChanged(const std::shared_ptr<const CSetting>& settin
 
 bool CGLESShader::OnEnabled()
 {
+  // 1. 处理 LUT 纹理 (静态初始化)
+  static GLuint lutTexture = 0;
+  if (lutTexture == 0) {
+      glGenTextures(1, &lutTexture);
+      glBindTexture(GL_TEXTURE_2D, lutTexture);
+      // 关键：针对 10bit (uint16_t) 数据，使用 GL_RGB16UI 内部格式
+      // 假设 PQLutData.h 里是 1024x32 的 uint16_t 数组
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16UI, 1024, 32, 0, GL_RGB_INTEGER, GL_UNSIGNED_SHORT, g_solidifiedPQLut);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  }
+
+  // 2. 判断是否满足查表条件 (默认值判断)
+  bool useLut = (std::abs(m_cachedGuiSdrPeak - 1.0f) < 0.001f && 
+                 std::abs(m_cachedGuiSdrSaturation - 1.0f) < 0.001f);
+
+  // 3. 绑定纹理
+  if (m_hLutSampler >= 0) {
+      glActiveTexture(GL_TEXTURE3); 
+      glBindTexture(GL_TEXTURE_2D, lutTexture);
+      glUniform1i(m_hLutSampler, 3);
+      glActiveTexture(GL_TEXTURE0);
+  }
   // This is called after glUseProgram()
 
   const GLfloat *projMatrix = glMatrixProject.Get();
@@ -309,7 +338,7 @@ bool CGLESShader::OnEnabled()
   {
     GuiFragmentBlockData fragmentBlock;
     fragmentBlock.guiParams0 = {0.0f, 1.0f, m_cachedGuiSdrPeak, m_cachedGuiSdrSaturation};
-    fragmentBlock.guiParams1 = {m_cachedHdrPgsPeak, m_cachedHdrPgsSaturation, 0.0f, 0.0f};
+    fragmentBlock.guiParams1 = {m_cachedHdrPgsPeak, m_cachedHdrPgsSaturation, useLut ? 1.0f : 0.0f, 0.0f};
     EnsureGuiUniformBuffer(m_fragmentUBO, sizeof(GuiFragmentBlockData));
     glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(GuiFragmentBlockData), &fragmentBlock);
     glBindBufferBase(GL_UNIFORM_BUFFER, GUI_FRAGMENT_BINDING_POINT, m_fragmentUBO);
@@ -322,6 +351,7 @@ bool CGLESShader::OnEnabled()
 
     if (m_sdrPeak >= 0) glUniform1f(m_sdrPeak, m_cachedGuiSdrPeak);
     if (m_sdrSaturation >= 0) glUniform1f(m_sdrSaturation, m_cachedGuiSdrSaturation);
+    if (m_hUseLut >= 0) glUniform1f(m_hUseLut, useLut ? 1.0f : 0.0f);
     if (m_hdrPgsPeak >= 0) glUniform1f(m_hdrPgsPeak, m_cachedHdrPgsPeak);
     if (m_hdrPgsSaturation >= 0) glUniform1f(m_hdrPgsSaturation, m_cachedHdrPgsSaturation);
   }
@@ -347,4 +377,29 @@ void CGLESShader::Free()
   m_hFragmentBlock = -1;
 
   CGLSLShaderProgram::Free();
+}
+
+void CGLSLShaderProgram::ApplyPQSettings(float sdrPeak, float sdrSaturation)
+{
+    // 1. 只有在第一次使用时上传纹理
+    static GLuint lutTexture = 0;
+    if (lutTexture == 0) {
+        glGenTextures(1, &lutTexture);
+        glBindTexture(GL_TEXTURE_2D, lutTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1024, 32, 0, GL_RGB, GL_UNSIGNED_BYTE, g_solidifiedPQLut);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    }
+
+    // 2. 判断是否为默认值（Peak=100nits对应1.0f，Saturation默认1.0f）[cite: 18, 412]
+    bool useLut = (std::abs(sdrPeak - 1.0f) < 0.001f && std::abs(sdrSaturation - 1.0f) < 0.001f);
+
+    // 3. 绑定 Uniforms
+    glActiveTexture(GL_TEXTURE3); // 假设使用槽位 3
+    glBindTexture(GL_TEXTURE_2D, lutTexture);
+    SetUniform("m_lutSampler", 3);
+    SetUniform("m_useLut", useLut ? 1.0f : 0.0f);
+    glActiveTexture(GL_TEXTURE0);
 }

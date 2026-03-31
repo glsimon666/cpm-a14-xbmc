@@ -35,6 +35,8 @@ public:
   GLint GetContrastLoc() { return m_hContrast; }
   GLint GetBrightnessLoc() { return m_hBrightness; }
   GLint GetModelLoc() { return m_hModel; }
+  GLint GetLutSamplerLoc() { return m_hLutSampler; }
+  GLint GetUseLutLoc()     { return m_hUseLut; }
   bool HardwareClipIsPossible() { return m_clipPossible; }
   GLfloat GetClipXFactor() { return m_clipXFactor; }
   GLfloat GetClipXOffset() { return m_clipXOffset; }
@@ -79,6 +81,9 @@ protected:
   GLint m_sdrSaturation;
   GLint m_hdrPgsPeak;
   GLint m_hdrPgsSaturation;
+  
+  GLint m_hLutSampler = -1; 
+  GLint m_hUseLut = -1;
   
   float m_cachedGuiSdrPeak = 0.0f;
   float m_cachedGuiSdrSaturation = 1.0f;

@@ -18,6 +18,9 @@
 #include <numeric>
 #include <cmath>
 #include <algorithm>
+#include <limits>
+#include <time.h>
+#include <sys/prctl.h>
 
 #include "AMLUtils.h"
 
@@ -1501,4 +1504,166 @@ void aml_toogle_video_freerun_mode()
       freerun_mode.Set(1);
     });
   }
+}
+
+void aml_wait(double waitUs)
+{
+  useconds_t uSeconds = static_cast<useconds_t>(waitUs);
+
+  static constexpr uint64_t LOG_THRESHOLD_US = 2000;
+
+  struct timespec now{};
+  clock_gettime(CLOCK_MONOTONIC, &now);
+
+  struct timespec target{};
+  target.tv_sec = uSeconds / 1000000;
+  target.tv_nsec = (uSeconds % 1000000) * 1000;
+
+  target.tv_sec += now.tv_sec;
+  target.tv_nsec += now.tv_nsec;
+
+  if (target.tv_nsec >= 1000000000) {
+    target.tv_sec++;
+    target.tv_nsec -= 1000000000;
+  }
+
+  const uint64_t deadline_us = static_cast<uint64_t>(target.tv_sec) * 1000000ULL +
+                               static_cast<uint64_t>(target.tv_nsec) / 1000ULL;
+  int ret;
+  do
+  {
+    ret = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &target, nullptr);
+  } while (ret == EINTR);
+
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  const uint64_t after_us = static_cast<uint64_t>(now.tv_sec) * 1000000ULL +
+                            static_cast<uint64_t>(now.tv_nsec) / 1000ULL;
+
+  const uint64_t late_us = (after_us > deadline_us) ? (after_us - deadline_us) : 0;
+
+  if (late_us > LOG_THRESHOLD_US)
+  {
+    char name[16] = {0};
+    pthread_getname_np(pthread_self(), name, sizeof(name));
+
+    logM(LOGINFO, "overslept: req:{}us late:{}us thread:{}",
+         static_cast<unsigned>(uSeconds),
+         static_cast<unsigned long long>(late_us),
+         name);
+  }
+}
+
+namespace
+{
+struct fb_vsync_early_request
+{
+  int32_t offset_us;
+  int32_t reserved;
+  int64_t next_vsync_ts;
+};
+
+struct fb_vsync_timing_request
+{
+  int64_t now_ts;
+  int64_t last_vsync_ts;
+  int64_t next_vsync_ts;
+  int64_t period_ns;
+  int32_t reserved0;
+  int32_t reserved1;
+};
+
+#ifndef FBIO_WAITFORVSYNC_EARLY_64
+#define FBIO_WAITFORVSYNC_EARLY_64 _IOWR('F', 0x24, struct fb_vsync_early_request)
+#endif
+
+#ifndef FBIO_GET_VSYNC_TIMING_64
+#define FBIO_GET_VSYNC_TIMING_64 _IOR('F', 0x25, struct fb_vsync_timing_request)
+#endif
+
+std::string GetFramebufferDevicePath()
+{
+  const char* env = getenv("FRAMEBUFFER");
+  if (env && env[0] != '\0')
+  {
+    std::string fb(env);
+    auto pos = fb.find("fb");
+    if (pos != std::string::npos)
+      fb = fb.substr(pos);
+
+    if (fb.rfind("/dev/", 0) == 0)
+      return fb;
+    return "/dev/" + fb;
+  }
+
+  return "/dev/fb0";
+}
+} // namespace
+
+bool aml_get_time_to_next_vsync_us(int& timeToNextVsyncUs)
+{
+  timeToNextVsyncUs = 0;
+
+  static int fbFd{-1};
+  static std::string fbPath;
+  if (fbFd < 0)
+  {
+    fbPath = GetFramebufferDevicePath();
+    fbFd = open(fbPath.c_str(), O_RDWR | O_CLOEXEC);
+    if (fbFd < 0)
+    {
+      logM(LOGWARNING, "failed to open {}: {}", fbPath, strerror(errno));
+      return false;
+    }
+
+    logM(LOGINFO, "opened {} fd:{}", fbPath, fbFd);
+  }
+
+  fb_vsync_timing_request req{};
+  if (ioctl(fbFd, FBIO_GET_VSYNC_TIMING_64, &req) < 0)
+  {
+    logM(LOGDEBUG, "ioctl failed on {}: {}", fbPath, strerror(errno));
+    return false;
+  }
+
+  if (req.now_ts <= 0 || req.next_vsync_ts <= 0 || req.next_vsync_ts < req.now_ts)
+    return false;
+
+  const int64_t deltaNs = req.next_vsync_ts - req.now_ts;
+  timeToNextVsyncUs = static_cast<int>(std::min<int64_t>(deltaNs / 1000, std::numeric_limits<int>::max()));
+
+  return true;
+}
+
+bool aml_try_set_thread_nice(int niceLevel)
+{
+  const int lvl = std::max(-20, std::min(niceLevel, 19));
+  errno = 0;
+  const int ret = setpriority(PRIO_PROCESS, 0, lvl);
+  if (ret != 0)
+  {
+    logM(LOGWARNING, "Failed to set nice {}: {}", lvl, strerror(errno));
+    return false;
+  }
+  logM(LOGINFO, "Set nice {}", lvl);
+  return true;
+}
+
+bool aml_set_timer_slack_ns(long slackNs)
+{
+#if defined(PR_SET_TIMERSLACK) && defined(PR_GET_TIMERSLACK)
+  const long oldSlackNs = prctl(PR_GET_TIMERSLACK);
+  const int setRet = prctl(PR_SET_TIMERSLACK, slackNs);
+  const long newSlackNs = prctl(PR_GET_TIMERSLACK);
+  logM(LOGINFO, "old:{}ns new:{}ns set_ret:{}", oldSlackNs, newSlackNs, setRet);
+  return setRet == 0;
+#else
+  (void)slackNs;
+  return false;
+#endif
+}
+
+bool aml_video_started()
+{
+  CSysfsPath videostarted{"/sys/class/tsync/videostarted"};
+  return (StringUtils::EqualsNoCase(videostarted.Get<std::string>().value(), "0x1"));
 }

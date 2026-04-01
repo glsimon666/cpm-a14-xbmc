@@ -717,6 +717,136 @@ bool CRenderManager::CalcOverlayActiveArea(CRect& src, CRect& dst)
   return true;
 }
 
+void CRenderManager::ClockAlign()
+{
+  struct WaitDebugInfo
+  {
+    bool used = false;
+    bool usedSlice = false;
+    bool gui = false;
+    bool gotNextIn = false;
+    bool gotNextInAfter = false;
+    double waitUs = 0.0;
+    double sleepUs = 0.0;
+    double sliceSleepUs = 0.0;
+    double frameTimeUs = 0.0;
+    int nextInUs = 0;
+    int nextInAfterUs = 0;
+    int guardUs = 0;
+    bool clamped = false;
+  } waitDbg;
+
+  const auto WaitSlice = [&](double waitUs)
+  {
+    // Sleep a bounded slice of the remaining gap.
+    // i.e. home in on the pts, ramping perceived frame rate until matching
+    const double frameTimeUs = m_presentframetime;
+    const double sleepUs = (waitUs > 1000000)
+      ? (frameTimeUs * 4)
+      : (frameTimeUs * (((waitUs / frameTimeUs) / 10) + 1));
+
+    waitDbg.used = true;
+    waitDbg.usedSlice = true;
+    waitDbg.waitUs = waitUs;
+    waitDbg.sliceSleepUs = sleepUs;
+    waitDbg.frameTimeUs = frameTimeUs;
+
+    aml_wait(sleepUs);
+  };
+
+  const auto Wait = [&](double waitUs)
+  {
+    // GUI-layer renderers are paced by the normal swap/present path.
+    if (!m_pRenderer || m_pRenderer->IsGuiLayer())
+    {
+      waitDbg.used = true;
+      waitDbg.gui = true;
+      waitDbg.waitUs = waitUs;
+      return aml_wait(waitUs);
+    }
+
+    int nextInUs{0};
+    if (!aml_get_time_to_next_vsync_us(nextInUs))
+    {
+      waitDbg.used = true;
+      waitDbg.waitUs = waitUs;
+      aml_wait(waitUs);
+      return;
+    }
+
+    waitDbg.used = true;
+    waitDbg.waitUs = waitUs;
+    waitDbg.gotNextIn = true;
+    waitDbg.nextInUs = nextInUs;
+
+    // Wait for the pts, but never closer than 8ms to the next vsync.
+    // If the pts would land inside the guard window, stop early to leave setup time.
+    constexpr int vsyncGuardUs = 8000;
+    waitDbg.guardUs = vsyncGuardUs;
+
+    double sleepUs = waitUs;
+    if (waitUs < nextInUs)
+    {
+      // pts is before the upcoming vsync: stop early if we'd land inside the guard window.
+      const int maxBeforeGuardUs = std::max(0, nextInUs - vsyncGuardUs);
+      sleepUs = std::min(waitUs, static_cast<double>(maxBeforeGuardUs));
+    }
+
+    waitDbg.sleepUs = sleepUs;
+    waitDbg.clamped = (sleepUs < waitUs);
+
+    if (sleepUs > 0)
+    {
+      aml_wait(sleepUs);
+
+      int nextInAfterUs{0};
+      if (aml_get_time_to_next_vsync_us(nextInAfterUs))
+      {
+        waitDbg.gotNextInAfter = true;
+        waitDbg.nextInAfterUs = nextInAfterUs;
+      }
+    }
+  };
+
+  double renderPts = m_dvdClock.GetClock();
+  double diff = (renderPts - m_presentpts);
+
+  // Seek may push the diff to a large negative value, make sure it is sensible.
+  // TODO: should be better protected elsewhere.
+  if (diff < 0)
+  {
+    double wait = -diff;
+
+    if (wait > m_presentframetime)
+      WaitSlice(wait);
+    else
+      Wait(wait);
+
+    renderPts = m_dvdClock.GetClock();
+    diff = (renderPts - m_presentpts);
+
+    const double initialGapUs = wait;
+    const double finalGapUs = -diff;
+
+    // Emit one consolidated line per alignment attempt.
+    logM(LOGDEBUG, "CRenderManager", "gapInit:[{:.0f}] gapFinal:[{:.0f}] ft:[{:.0f}] wait:[{:.0f}] mode:[{}] nextIn:[{}] guard:[{}] sleep:[{:.0f}] clamped:[{}] nextAfter:[{}] sliceSleep:[{:.0f}] presenting:[{:02d}] queued:[{}] skip:[{:02d}]",
+      initialGapUs, finalGapUs, m_presentframetime,
+      waitDbg.used ? waitDbg.waitUs : wait,
+      waitDbg.used ? (waitDbg.gui ? "gui" : (waitDbg.usedSlice ? "slice" : "video")) : "none",
+      waitDbg.gotNextIn ? waitDbg.nextInUs : -1,
+      waitDbg.guardUs,
+      waitDbg.usedSlice ? 0 : waitDbg.sleepUs,
+      waitDbg.clamped,
+      waitDbg.gotNextInAfter ? waitDbg.nextInAfterUs : -1,
+      waitDbg.usedSlice ? waitDbg.sliceSleepUs : 0.0,
+      m_presentsource, m_queued.size(), m_QueueSkip);
+
+    // Escalate only when we're meaningfully late (gapFinal is negative when late).
+    if (finalGapUs < -2000.0)
+      logM(LOGWARNING, "CRenderManager", "late gapFinal:[{:.0f}] ft:[{:.0f}]", finalGapUs, m_presentframetime);
+  }
+}
+
 void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
 {
   CSingleExit exitLock(CServiceBroker::GetWinSystem()->GetGfxContext());
@@ -849,57 +979,63 @@ bool CRenderManager::IsVideoLayer()
   return false;
 }
 
+void inline CRenderManager::RenderUpdate(bool clear, unsigned int flags, unsigned int alpha)
+{
+  ClockAlign();
+  m_pRenderer->RenderUpdate(m_presentsource, m_presentsource, clear, flags, alpha);
+  m_dataCacheCore.SetRenderPts(m_presentpts);
+}
+
 /* simple present method */
 void CRenderManager::PresentSingle(bool clear, DWORD flags, DWORD alpha)
 {
-  const SPresent& m = m_Queue[m_presentsource];
+  const SPresent& present = m_Queue[m_presentsource];
 
-  if (m.presentfield == FS_BOT)
-    m_pRenderer->RenderUpdate(m_presentsource, m_presentsourcePast, clear, flags | RENDER_FLAG_BOT, alpha);
-  else if (m.presentfield == FS_TOP)
-    m_pRenderer->RenderUpdate(m_presentsource, m_presentsourcePast, clear, flags | RENDER_FLAG_TOP, alpha);
+  if (present.presentfield == FS_BOT)
+    RenderUpdate(clear, flags | RENDER_FLAG_BOT, alpha);
+  else if (present.presentfield == FS_TOP)
+    RenderUpdate(clear, flags | RENDER_FLAG_TOP, alpha);
   else
-    m_pRenderer->RenderUpdate(m_presentsource, m_presentsourcePast, clear, flags, alpha);
+    RenderUpdate(clear, flags, alpha);
 }
 
 /* new simpler method of handling interlaced material, *
- * we just render the two fields right after eachother */
+ * we just render the two fields right after each other */
 void CRenderManager::PresentFields(bool clear, DWORD flags, DWORD alpha)
 {
-  const SPresent& m = m_Queue[m_presentsource];
+  const SPresent& present = m_Queue[m_presentsource];
 
-  if(m_presentstep == PRESENT_FRAME)
+  if (m_presentstep == PRESENT_FRAME)
   {
-    if( m.presentfield == FS_BOT)
-      m_pRenderer->RenderUpdate(m_presentsource, m_presentsourcePast, clear, flags | RENDER_FLAG_BOT | RENDER_FLAG_FIELD0, alpha);
+    if (present.presentfield == FS_BOT)
+      RenderUpdate(clear, flags | RENDER_FLAG_BOT | RENDER_FLAG_FIELD0, alpha);
     else
-      m_pRenderer->RenderUpdate(m_presentsource, m_presentsourcePast, clear, flags | RENDER_FLAG_TOP | RENDER_FLAG_FIELD0, alpha);
+      RenderUpdate(clear, flags | RENDER_FLAG_TOP | RENDER_FLAG_FIELD0, alpha);
   }
   else
   {
-    if( m.presentfield == FS_TOP)
-      m_pRenderer->RenderUpdate(m_presentsource, m_presentsourcePast, clear, flags | RENDER_FLAG_BOT | RENDER_FLAG_FIELD1, alpha);
+    if (present.presentfield == FS_TOP)
+      RenderUpdate(clear, flags | RENDER_FLAG_BOT | RENDER_FLAG_FIELD1, alpha);
     else
-      m_pRenderer->RenderUpdate(m_presentsource, m_presentsourcePast, clear, flags | RENDER_FLAG_TOP | RENDER_FLAG_FIELD1, alpha);
+      RenderUpdate(clear, flags | RENDER_FLAG_TOP | RENDER_FLAG_FIELD1, alpha);
   }
 }
 
 void CRenderManager::PresentBlend(bool clear, DWORD flags, DWORD alpha)
 {
-  const SPresent& m = m_Queue[m_presentsource];
+  const SPresent& present = m_Queue[m_presentsource];
 
-  if( m.presentfield == FS_BOT )
+  if (present.presentfield == FS_BOT)
   {
-    m_pRenderer->RenderUpdate(m_presentsource, m_presentsourcePast, clear, flags | RENDER_FLAG_BOT | RENDER_FLAG_NOOSD, alpha);
-    m_pRenderer->RenderUpdate(m_presentsource, m_presentsourcePast, false, flags | RENDER_FLAG_TOP, alpha / 2);
+    RenderUpdate(clear, flags | RENDER_FLAG_BOT | RENDER_FLAG_NOOSD, alpha);
+    RenderUpdate(false, flags | RENDER_FLAG_TOP, alpha / 2);
   }
   else
   {
-    m_pRenderer->RenderUpdate(m_presentsource, m_presentsourcePast, clear, flags | RENDER_FLAG_TOP | RENDER_FLAG_NOOSD, alpha);
-    m_pRenderer->RenderUpdate(m_presentsource, m_presentsourcePast, false, flags | RENDER_FLAG_BOT, alpha / 2);
+    RenderUpdate(clear, flags | RENDER_FLAG_TOP | RENDER_FLAG_NOOSD, alpha);
+    RenderUpdate(false, flags | RENDER_FLAG_BOT, alpha / 2);
   }
 }
-
 void CRenderManager::UpdateLatencyTweak()
 {
   float fps = CServiceBroker::GetWinSystem()->GetGfxContext().GetFPS();

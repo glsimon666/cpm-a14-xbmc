@@ -16,7 +16,7 @@
 #include <algorithm>
 #include <cmath>
 
-#define MAXERR DVD_MSEC_TO_TIME(2.5)
+#define MAXERR DVD_MSEC_TO_TIME(1.0)
 
 CPtsTracker::CPtsTracker()
 {

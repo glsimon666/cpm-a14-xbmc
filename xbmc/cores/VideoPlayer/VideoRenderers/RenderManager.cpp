@@ -747,7 +747,6 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
     if (!m_pRenderer->IsGuiLayer())
       m_pRenderer->Update();
 
-    m_overlays.SetForceInside(CalcOverlayActiveArea(src, dst));
     const bool hasOverlay = m_overlays.HasOverlay(m_presentsource);
     m_renderedOverlay = hasOverlay;
 
@@ -793,13 +792,11 @@ void CRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
           m_debugRenderer.SetInfo(info);
         }
 
-        m_debugRenderer.SetInfo(info);
+        m_debugRenderer.Render(src, dst, view);
+
+        m_debugTimer.Set(1000ms);
+        m_renderedOverlay = true;
       }
-
-      m_debugRenderer.Render(src, dst, view);
-
-      m_debugTimer.Set(1000ms);
-      m_renderedOverlay = true;
     }
   }
 
@@ -1119,7 +1116,7 @@ bool CRenderManager::AddVideoPicture(const VideoPicture& picture, volatile std::
   // have to scan/sort.
   if (std::find(m_queued.begin(), m_queued.end(), index) == m_queued.end())
   {
-    const double pts = present.pts;
+    const double pts = m.pts;
     if (m_queued.empty() || m_Queue[m_queued.back()].pts <= pts)
     {
       m_queued.push_back(index);

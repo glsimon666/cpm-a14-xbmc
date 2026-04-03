@@ -130,6 +130,8 @@ public:
 
   void SetDelay(int delay) { m_videoDelay = delay; }
   int GetDelay() { return m_videoDelay; }
+  
+  int GetVideoLatencyTweak() { return m_videoLatencyTweak; }
 
   void SetVideoSettings(const CVideoSettings& settings);
 
@@ -171,6 +173,7 @@ protected:
   void ManageCaptures();
 
   void UpdateLatencyTweak();
+  void UpdateVideoLatencyTweak();
   void CheckEnableClockSync();
 
   CBaseRenderer *m_pRenderer = nullptr;
@@ -213,6 +216,9 @@ protected:
   };
   ERENDERSTATE m_renderState = STATE_UNCONFIGURED;
   CEvent m_stateEvent;
+  
+  // Display latency tweak from AdvancedSettings for the current refresh rate and resolution in milliseconds
+  std::atomic_int m_videoLatencyTweak = 0;
 
   /// Display latency tweak value from AdvancedSettings for the current refresh rate and resolution, and audio
   /// in milliseconds

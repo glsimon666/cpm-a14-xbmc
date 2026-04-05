@@ -25,7 +25,7 @@ class CBitstreamConverter;
 
 class CDVDVideoCodecAmlogic;
 
-typedef std::tuple<uint8_t*, uint32_t, bool> DLDemuxPacket;
+typedef std::tuple<uint8_t*, uint32_t, bool, double> DLDemuxPacket;
 
 class CAMLVideoBuffer : public CVideoBuffer
 {
@@ -107,4 +107,7 @@ private:
   static std::atomic<bool> m_InstanceGuard;
 
   std::list<DLDemuxPacket> m_packages;
+  bool            m_last_added;
+  uint8_t        *m_last_pData;
+  uint32_t        m_last_iSize;
 };

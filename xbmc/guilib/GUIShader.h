@@ -37,7 +37,7 @@ public:
   void UpdateVisibility(const CGUIListItem *item = NULL) override;
   bool OnAction(const CAction &action) override ;
   bool OnMessage(CGUIMessage& message) override;
-  void OnFocus(bool focused) override;
+  void SetFocus(bool focused) override;
   void AllocResources() override;
   void FreeResources(bool immediately = false) override;
   void DynamicResourceAlloc(bool bOnOff) override;

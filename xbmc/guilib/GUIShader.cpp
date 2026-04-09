@@ -337,10 +337,10 @@ void CGUIShader::SetAction(const std::string& action)
     m_action = "always"; // Default to always
 }
 
-void CGUIShader::OnFocus(bool focused) override
+void CGUIShader::SetFocus(bool focused)
 {
   m_hasFocus = focused;
-  CGUIControl::OnFocus(focused);
+  CGUIControl::SetFocus(focused);
 }
 
 void CGUIShader::SetWidth(float width)

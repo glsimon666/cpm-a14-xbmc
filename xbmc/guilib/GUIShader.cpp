@@ -11,7 +11,6 @@
 #include "ServiceBroker.h"
 #include "addons/Skin.h"
 #include "guilib/GUIComponent.h"
-#include "guilib/GUIRenderManager.h"
 #include "guilib/Shader.h"
 #include "windowing/GraphicContext.h"
 
@@ -148,7 +147,17 @@ void CGUIShader::Render()
         rect = CRect(posX, posY, posX + width, posY + height);
       }
       
-      CServiceBroker::GetRenderManager().DrawQuad(rect);
+      // Draw a quad using OpenGL directly
+      glBegin(GL_QUADS);
+      glTexCoord2f(0.0f, 0.0f);
+      glVertex2f(rect.x1, rect.y1);
+      glTexCoord2f(1.0f, 0.0f);
+      glVertex2f(rect.x2, rect.y1);
+      glTexCoord2f(1.0f, 1.0f);
+      glVertex2f(rect.x2, rect.y2);
+      glTexCoord2f(0.0f, 1.0f);
+      glVertex2f(rect.x1, rect.y2);
+      glEnd();
 
       // Capture the first frame if not already done
       if (!m_firstFrameRendered)

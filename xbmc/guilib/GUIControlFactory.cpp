@@ -20,6 +20,7 @@
 #include "GUIFixedListContainer.h"
 #include "GUIFontManager.h"
 #include "GUIImage.h"
+#include "GUIShader.h"
 #include "GUIInfoManager.h"
 #include "GUILabelControl.h"
 #include "GUIListContainer.h"
@@ -82,6 +83,7 @@ static const ControlMapping controls[] = {
     {"grouplist", CGUIControl::GUICONTROL_GROUPLIST},
     {"image", CGUIControl::GUICONTROL_IMAGE},
     {"image", CGUIControl::GUICONTROL_BORDEREDIMAGE},
+    {"shader", CGUIControl::GUICONTROL_SHADER},
     {"label", CGUIControl::GUICONTROL_LABEL},
     {"label", CGUIControl::GUICONTROL_LISTLABEL},
     {"list", CGUIControl::GUICONTAINER_LIST},
@@ -1500,6 +1502,25 @@ CGUIControl* CGUIControlFactory::Create(int parentID,
       icontrol->SetInfo(textureFile);
       icontrol->SetAspectRatio(aspect);
       icontrol->SetCrossFade(fadeTime);
+
+      break;
+    }
+    case CGUIControl::GUICONTROL_SHADER:
+    {
+      std::string vertexShader, fragmentShader, shaderFile, action;
+      XMLUtils::GetString(pControlNode, "vertexshader", vertexShader);
+      XMLUtils::GetString(pControlNode, "fragmentshader", fragmentShader);
+      XMLUtils::GetString(pControlNode, "shaderfile", shaderFile);
+      XMLUtils::GetString(pControlNode, "action", action);
+      
+      control = new CGUIShader(parentID, id, posX, posY, width, height, vertexShader, fragmentShader);
+      CGUIShader* scontrol = static_cast<CGUIShader*>(control);
+      
+      if (!shaderFile.empty())
+        scontrol->SetShaderFile(shaderFile);
+      
+      if (!action.empty())
+        scontrol->SetAction(action);
 
       break;
     }

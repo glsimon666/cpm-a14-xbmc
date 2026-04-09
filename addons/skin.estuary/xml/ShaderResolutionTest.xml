@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<window>
+	<defaultcontrol>9000</defaultcontrol>
+	<backgroundcolor>background</backgroundcolor>
+	<controls>
+		<control type="shader" id="100">
+			<left>100</left>
+			<top>100</top>
+			<width>2000</width>
+			<height>1500</height>
+			<shaderfile>basic.frag</shaderfile>
+			<action>always</action>
+		</control>
+		<control type="label" id="101">
+			<left>100</left>
+			<top>200</top>
+			<width>400</width>
+			<height>50</height>
+			<label>Shader with 2000x1500 resolution (should be limited to 1080p)</label>
+			<textcolor>white</textcolor>
+		</control>
+	</controls>
+</window>

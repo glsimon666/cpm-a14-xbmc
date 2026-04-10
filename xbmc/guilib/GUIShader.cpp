@@ -12,6 +12,7 @@
 #include "addons/Skin.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/Shader.h"
+#include "rendering/gl/RenderSystemGL.h"
 #include "utils/GLUtils.h"
 #include "windowing/GraphicContext.h"
 
@@ -25,9 +26,10 @@ CGUIShader::CGUIShader(int parentID, int controlID, float posX, float posY, floa
     m_hasFocus(false),
     m_action("always"),
     m_firstFrameRendered(false),
-    m_firstFrameBuffer(nullptr)
+    m_firstFrameBuffer(nullptr),
+    m_renderSystem(nullptr)
 {
-
+  m_renderSystem = static_cast<CRenderSystemGL*>(CServiceBroker::GetRenderSystem());
 }
 
 CGUIShader::CGUIShader(const CGUIShader &left)
@@ -144,17 +146,74 @@ void CGUIShader::Render()
         rect = CRect(posX, posY, posX + width, posY + height);
       }
       
-      // Draw a quad using OpenGL directly
-      glBegin(GL_QUADS);
-      glTexCoord2f(0.0f, 0.0f);
-      glVertex2f(rect.x1, rect.y1);
-      glTexCoord2f(1.0f, 0.0f);
-      glVertex2f(rect.x2, rect.y1);
-      glTexCoord2f(1.0f, 1.0f);
-      glVertex2f(rect.x2, rect.y2);
-      glTexCoord2f(0.0f, 1.0f);
-      glVertex2f(rect.x1, rect.y2);
-      glEnd();
+      // Draw a quad using modern OpenGL
+      struct PackedVertex {
+        float x, y, z;
+        float u1, v1;
+      };
+      
+      PackedVertex vertices[4];
+      
+      // TopLeft
+      vertices[0].x = rect.x1;
+      vertices[0].y = rect.y1;
+      vertices[0].z = 0.0f;
+      vertices[0].u1 = 0.0f;
+      vertices[0].v1 = 0.0f;
+      
+      // TopRight
+      vertices[1].x = rect.x2;
+      vertices[1].y = rect.y1;
+      vertices[1].z = 0.0f;
+      vertices[1].u1 = 1.0f;
+      vertices[1].v1 = 0.0f;
+      
+      // BottomRight
+      vertices[2].x = rect.x2;
+      vertices[2].y = rect.y2;
+      vertices[2].z = 0.0f;
+      vertices[2].u1 = 1.0f;
+      vertices[2].v1 = 1.0f;
+      
+      // BottomLeft
+      vertices[3].x = rect.x1;
+      vertices[3].y = rect.y2;
+      vertices[3].z = 0.0f;
+      vertices[3].u1 = 0.0f;
+      vertices[3].v1 = 1.0f;
+      
+      GLushort indices[] = {0, 1, 2, 0, 2, 3};
+      
+      GLuint VertexVBO;
+      GLuint IndexVBO;
+      
+      glGenBuffers(1, &VertexVBO);
+      glBindBuffer(GL_ARRAY_BUFFER, VertexVBO);
+      glBufferData(GL_ARRAY_BUFFER, sizeof(PackedVertex)*4, &vertices[0], GL_STATIC_DRAW);
+      
+      GLint posLoc = m_renderSystem->ShaderGetPos();
+      GLint tex0Loc = m_renderSystem->ShaderGetCoord0();
+      
+      glVertexAttribPointer(posLoc, 3, GL_FLOAT, 0, sizeof(PackedVertex),
+                            reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, x)));
+      glEnableVertexAttribArray(posLoc);
+      glVertexAttribPointer(tex0Loc, 2, GL_FLOAT, 0, sizeof(PackedVertex),
+                            reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, u1)));
+      glEnableVertexAttribArray(tex0Loc);
+      
+      glGenBuffers(1, &IndexVBO);
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexVBO);
+      glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+      
+      glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
+      
+      glDisableVertexAttribArray(posLoc);
+      glDisableVertexAttribArray(tex0Loc);
+      
+      glBindBuffer(GL_ARRAY_BUFFER, 0);
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+      glDeleteBuffers(1, &VertexVBO);
+      glDeleteBuffers(1, &IndexVBO);
 
       // Capture the first frame if not already done
       if (!m_firstFrameRendered)

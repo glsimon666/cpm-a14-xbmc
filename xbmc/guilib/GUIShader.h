@@ -17,7 +17,11 @@
 #include "guilib/guiinfo/GUIInfoLabel.h"
 #include "Shader.h"
 
+#include "system_gl.h"
+
 #include <vector>
+
+class CRenderSystemGL;
 
 /*!
  \ingroup controls
@@ -94,4 +98,6 @@ protected:
   unsigned char* m_firstFrameBuffer; // Buffer to store the first frame
   static const int MAX_WIDTH = 1920; // Maximum width (1080p)
   static const int MAX_HEIGHT = 1080; // Maximum height (1080p)
+  
+  CRenderSystemGL *m_renderSystem;
 };

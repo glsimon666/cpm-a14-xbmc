@@ -12,7 +12,6 @@
 #include "addons/Skin.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/Shader.h"
-#include "guilib/SkinInfo.h"
 #include "windowing/GraphicContext.h"
 
 // OpenGL includes

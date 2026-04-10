@@ -12,11 +12,8 @@
 #include "addons/Skin.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/Shader.h"
+#include "utils/GLUtils.h"
 #include "windowing/GraphicContext.h"
-
-// OpenGL includes
-#include "windowing/WindowingFactory.h"
-#include "rendering/gl/GLIncludes.h"
 
 CGUIShader::CGUIShader(int parentID, int controlID, float posX, float posY, float width, float height, const std::string& vertexShader, const std::string& fragmentShader)
   : CGUIControl(parentID, controlID, posX, posY, width, height),

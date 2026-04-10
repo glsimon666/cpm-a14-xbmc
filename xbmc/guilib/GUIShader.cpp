@@ -12,8 +12,11 @@
 #include "addons/Skin.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/Shader.h"
-#include "utils/GLUtils.h"
+#include "guilib/SkinInfo.h"
 #include "windowing/GraphicContext.h"
+
+// OpenGL includes
+#include <GL/gl.h>
 
 CGUIShader::CGUIShader(int parentID, int controlID, float posX, float posY, float width, float height, const std::string& vertexShader, const std::string& fragmentShader)
   : CGUIControl(parentID, controlID, posX, posY, width, height),
@@ -27,7 +30,7 @@ CGUIShader::CGUIShader(int parentID, int controlID, float posX, float posY, floa
     m_firstFrameRendered(false),
     m_firstFrameBuffer(nullptr)
 {
-  m_info.SetParentWindow(parentID);
+
 }
 
 CGUIShader::CGUIShader(const CGUIShader &left)
@@ -109,7 +112,7 @@ void CGUIShader::Render()
       UpdateUniforms(NULL);
 
       // Draw a quad with resolution limit
-      CRect rect = GetRenderRect();
+      CRect rect = GetRenderRegion();
       
       // Limit resolution to 1080p
       float width = rect.Width();
@@ -179,7 +182,7 @@ void CGUIShader::Render()
   else if (!shouldRender && m_firstFrameRendered && m_firstFrameBuffer)
   {
     // Draw the first frame
-    CRect rect = GetRenderRect();
+    CRect rect = GetRenderRegion();
     // TODO: Draw the captured first frame here
     // This would require creating a texture from the buffer and rendering it
   }
@@ -213,14 +216,14 @@ void CGUIShader::AllocResources()
   if (!m_shaderFile.empty())
   {
     // Get the full path to the shader file from the skin's media folder
-    std::string shaderPath = CServiceBroker::GetSkin()->GetSkinPath("media/" + m_shaderFile);
+    std::string shaderPath = g_SkinInfo->GetSkinPath("media/" + m_shaderFile);
 
     m_shaderProgram = std::make_unique<Shaders::CGLSLShaderProgram>();
     // Determine shader type based on file extension
     if (shaderPath.substr(shaderPath.find_last_of(".") + 1) == "frag")
     {
       // Load as fragment shader with default vertex shader
-      std::string defaultVertexShader = CServiceBroker::GetSkin()->GetSkinPath("media/default.vert");
+      std::string defaultVertexShader = g_SkinInfo->GetSkinPath("media/default.vert");
       if (m_shaderProgram->VertexShader()->LoadSource(defaultVertexShader) &&
           m_shaderProgram->PixelShader()->LoadSource(shaderPath) &&
           m_shaderProgram->CompileAndLink())
@@ -242,8 +245,8 @@ void CGUIShader::AllocResources()
   else if (!m_vertexShader.empty() && !m_fragmentShader.empty())
   {
     // Get the full path to the shader files from the skin's media folder
-    std::string vertexShaderPath = CServiceBroker::GetSkin()->GetSkinPath("media/" + m_vertexShader);
-    std::string fragmentShaderPath = CServiceBroker::GetSkin()->GetSkinPath("media/" + m_fragmentShader);
+    std::string vertexShaderPath = g_SkinInfo->GetSkinPath("media/" + m_vertexShader);
+    std::string fragmentShaderPath = g_SkinInfo->GetSkinPath("media/" + m_fragmentShader);
 
     m_shaderProgram = std::make_unique<Shaders::CGLSLShaderProgram>();
     if (m_shaderProgram->VertexShader()->LoadSource(vertexShaderPath) &&
@@ -381,13 +384,15 @@ const std::string& CGUIShader::GetFragmentShader() const
 
 CRect CGUIShader::CalcRenderRegion() const
 {
-  return GetRenderRect();
+  return GetRenderRegion();
 }
 
+#ifdef _DEBUG
 void CGUIShader::DumpTextureUse()
 {
   CGUIControl::DumpTextureUse();
 }
+#endif
 
 void CGUIShader::AllocateOnDemand()
 {
@@ -397,14 +402,14 @@ void CGUIShader::AllocateOnDemand()
   if (!m_shaderFile.empty())
   {
     // Get the full path to the shader file from the skin's media folder
-    std::string shaderPath = CServiceBroker::GetSkin()->GetSkinPath("media/" + m_shaderFile);
+    std::string shaderPath = g_SkinInfo->GetSkinPath("media/" + m_shaderFile);
 
     m_shaderProgram = std::make_unique<Shaders::CGLSLShaderProgram>();
     // Determine shader type based on file extension
     if (shaderPath.substr(shaderPath.find_last_of(".") + 1) == "frag")
     {
       // Load as fragment shader with default vertex shader
-      std::string defaultVertexShader = CServiceBroker::GetSkin()->GetSkinPath("media/default.vert");
+      std::string defaultVertexShader = g_SkinInfo->GetSkinPath("media/default.vert");
       if (m_shaderProgram->VertexShader()->LoadSource(defaultVertexShader) &&
           m_shaderProgram->PixelShader()->LoadSource(shaderPath) &&
           m_shaderProgram->CompileAndLink())
@@ -426,8 +431,8 @@ void CGUIShader::AllocateOnDemand()
   else if (!m_vertexShader.empty() && !m_fragmentShader.empty())
   {
     // Get the full path to the shader files from the skin's media folder
-    std::string vertexShaderPath = CServiceBroker::GetSkin()->GetSkinPath("media/" + m_vertexShader);
-    std::string fragmentShaderPath = CServiceBroker::GetSkin()->GetSkinPath("media/" + m_fragmentShader);
+    std::string vertexShaderPath = g_SkinInfo->GetSkinPath("media/" + m_vertexShader);
+    std::string fragmentShaderPath = g_SkinInfo->GetSkinPath("media/" + m_fragmentShader);
 
     m_shaderProgram = std::make_unique<Shaders::CGLSLShaderProgram>();
     if (m_shaderProgram->VertexShader()->LoadSource(vertexShaderPath) &&
@@ -469,7 +474,7 @@ void CGUIShader::UpdateUniforms(const CGUIListItem* item)
   float time = (float)m_lastRenderTime / 1000.0f;
   
   // Get the resolution
-  CRect rect = GetRenderRect();
+  CRect rect = GetRenderRegion();
   float width = rect.Width();
   float height = rect.Height();
   

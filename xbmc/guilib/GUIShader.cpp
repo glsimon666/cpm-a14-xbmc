@@ -191,8 +191,9 @@ void CGUIShader::Render()
       glBindBuffer(GL_ARRAY_BUFFER, VertexVBO);
       glBufferData(GL_ARRAY_BUFFER, sizeof(PackedVertex)*4, &vertices[0], GL_STATIC_DRAW);
       
-      GLint posLoc = m_renderSystem->ShaderGetPos();
-      GLint tex0Loc = m_renderSystem->ShaderGetCoord0();
+      // Get attribute locations using glGetAttribLocation
+      GLint posLoc = glGetAttribLocation(m_shaderProgram->ProgramHandle(), "position");
+      GLint tex0Loc = glGetAttribLocation(m_shaderProgram->ProgramHandle(), "texCoord");
       
       glVertexAttribPointer(posLoc, 3, GL_FLOAT, 0, sizeof(PackedVertex),
                             reinterpret_cast<const GLvoid*>(offsetof(PackedVertex, x)));
